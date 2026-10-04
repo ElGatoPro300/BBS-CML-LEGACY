@@ -641,10 +641,9 @@ public class UIFilmPreview extends UIElement
                 {
                     if (this.panel.getController().getPovMode() == UIFilmController.CAMERA_MODE_ORBIT)
                     {
-                        if (!this.panel.getController().orbit.isAnimating() && this.panel.getController().orbit.canStart(context) >= 0)
+                        if (!this.panel.getController().orbit.isAnimating() && this.panel.getController().orbit.canStart(context) >= 0
+                            && this.panel.getController().orbit.start(context))
                         {
-                            this.panel.getController().orbit.start(context);
-
                             return true;
                         }
                     }
@@ -679,10 +678,9 @@ public class UIFilmPreview extends UIElement
 
             if (this.panel.getController().getPovMode() == UIFilmController.CAMERA_MODE_ORBIT
                 && !this.panel.getController().orbit.isAnimating()
-                && this.panel.getController().orbit.canStart(context) >= 0)
+                && this.panel.getController().orbit.canStart(context) >= 0
+                && this.panel.getController().orbit.start(context))
             {
-                this.panel.getController().orbit.start(context);
-
                 return true;
             }
 
