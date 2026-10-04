@@ -4967,10 +4967,8 @@ public class UIReplaysEditor extends UIElement implements GizmoSurface
         {
             int button = this.filmPanel.getController().orbit.canStart(context);
 
-            if (button >= 0)
+            if (button >= 0 && this.filmPanel.getController().orbit.start(context))
             {
-                this.filmPanel.getController().orbit.start(context);
-
                 return true;
             }
         }
