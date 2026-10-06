@@ -427,15 +427,17 @@ public class FormUtilsClient
 
             try
             {
-                /* Pick FBO and FramebufferForm offscreen fills: vanilla/Iris RenderLayer
-                 * setup can steal the main target/projection mid-draw. */
-                StencilFormFramebuffer.rebindActive();
-                FramebufferFormRenderer.rebindActive();
+                if (context.isPicking())
+                {
+                    StencilFormFramebuffer.rebindActive();
+                }
 
                 renderer.render(context);
 
-                StencilFormFramebuffer.rebindActive();
-                FramebufferFormRenderer.rebindActive();
+                if (context.isPicking())
+                {
+                    StencilFormFramebuffer.rebindActive();
+                }
             }
             catch (Exception e)
             {}

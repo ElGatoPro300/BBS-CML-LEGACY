@@ -2,8 +2,6 @@ package mchorse.bbs_mod.graphics;
 
 import mchorse.bbs_mod.graphics.texture.Texture;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
@@ -34,21 +32,10 @@ public class FramebufferPool
         return (long) texture.width * texture.height * 8L;
     }
 
-    /**
-     * {@link Texture} construction / sampling setup binds onto the current active unit.
-     * Mid-world that unit is often the lightmap or atlas — leaving the new FBO colour
-     * texture there blacks out the world for the rest of the frame (visible when
-     * FramebufferForm view extent forces a new size allocation).
-     */
     private static Framebuffer create(int width, int height)
     {
         int previousDraw = GL30.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousRead = GL30.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
-        int previousActive = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
-
-        GlStateManager._activeTexture(GL13.GL_TEXTURE0);
-
-        int previousBinding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         Framebuffer framebuffer = new Framebuffer();
 
         try
@@ -77,37 +64,19 @@ public class FramebufferPool
         {
             GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
             GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
-            GlStateManager._activeTexture(GL13.GL_TEXTURE0);
-            GlStateManager._bindTexture(previousBinding);
-            GlStateManager._activeTexture(previousActive);
         }
     }
 
     /**
      * Form FBOs must stay NEAREST (crisp pixelation at low resolution). Iris / other
      * reload paths can rewrite sampler state on existing texture ids; re-assert here.
-     * Always restores the previous active unit and TU0 binding.
      */
     private static void ensurePixelSampling(Texture texture)
     {
-        int previousActive = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
-
-        GlStateManager._activeTexture(GL13.GL_TEXTURE0);
-
-        int previousBinding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-
-        try
-        {
-            texture.bind();
-            texture.setFilter(GL11.GL_NEAREST);
-            texture.setWrap(GL13.GL_CLAMP_TO_EDGE);
-            texture.setParameter(GL30.GL_TEXTURE_MAX_LEVEL, 0);
-        }
-        finally
-        {
-            GlStateManager._bindTexture(previousBinding);
-            GlStateManager._activeTexture(previousActive);
-        }
+        texture.bind();
+        texture.setFilter(GL11.GL_NEAREST);
+        texture.setWrap(GL13.GL_CLAMP_TO_EDGE);
+        texture.setParameter(GL30.GL_TEXTURE_MAX_LEVEL, 0);
     }
 
     public Framebuffer get(int width, int height)
@@ -155,34 +124,8 @@ public class FramebufferPool
 
             iterator.remove();
             this.idleBytes -= getBytes(oldest);
-            unbindIfBound(oldest);
             oldest.delete();
         }
-    }
-
-    /**
-     * Deleting a texture that is still bound to TU0 leaves a stale name until the next
-     * bind — scrubbing view extent churns sizes and can hit this path every change.
-     */
-    private static void unbindIfBound(Framebuffer framebuffer)
-    {
-        Texture texture = framebuffer.getMainTexture();
-
-        if (texture == null || texture.id <= 0)
-        {
-            return;
-        }
-
-        int previousActive = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
-
-        GlStateManager._activeTexture(GL13.GL_TEXTURE0);
-
-        if (GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D) == texture.id)
-        {
-            GlStateManager._bindTexture(0);
-        }
-
-        GlStateManager._activeTexture(previousActive);
     }
 
     public void delete()

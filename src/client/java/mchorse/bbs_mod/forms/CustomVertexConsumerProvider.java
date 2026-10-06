@@ -1,6 +1,5 @@
 package mchorse.bbs_mod.forms;
 
-import mchorse.bbs_mod.forms.renderers.FramebufferFormRenderer;
 import mchorse.bbs_mod.forms.renderers.utils.BlockPaintOverlayVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.GlowEmissionVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.RecolorVertexConsumer;
@@ -27,10 +26,8 @@ public class CustomVertexConsumerProvider implements VertexConsumerProvider
 
     public static void drawLayer(RenderLayer layer)
     {
-        /* Rebind before/after layer setup: RenderLayer startDrawing can steal the main FB
-         * (and under Iris, the world projection). Keep pick + framebuffer-form targets. */
+        /* Rebind before/after layer setup: RenderLayer startDrawing can steal the main FB. */
         StencilFormFramebuffer.rebindActive();
-        FramebufferFormRenderer.rebindActive();
 
         if (runnables != null)
         {
@@ -38,7 +35,6 @@ public class CustomVertexConsumerProvider implements VertexConsumerProvider
         }
 
         StencilFormFramebuffer.rebindActive();
-        FramebufferFormRenderer.rebindActive();
     }
 
     public static void hijackVertexFormat(Consumer<RenderLayer> runnable)
