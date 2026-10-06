@@ -2,7 +2,6 @@ package mchorse.bbs_mod.ui.dashboard.welcome;
 
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.utils.Area;
-import mchorse.bbs_mod.utils.colors.Colors;
 
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
