@@ -10,6 +10,7 @@ import org.lwjgl.BufferUtils;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 /** Std140 layout shared with bbs:model_effects.glsl. Values belong to the configured program. */
 public final class ModelEffectUniforms

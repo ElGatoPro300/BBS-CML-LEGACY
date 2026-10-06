@@ -10,10 +10,10 @@ import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.colors.Colors;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 /**
  * Slide 0: Farewell and tribute to BBS CML 2.x.
@@ -29,10 +29,10 @@ public class UIWelcomeFarewellSlide extends UIElement
         super();
     }
 
-    private void drawPlayerHead(DrawContext drawContext, Identifier skinTexture, int x, int y, int size)
+    private void drawPlayerHead(GuiGraphicsExtractor drawContext, Identifier skinTexture, int x, int y, int size)
     {
-        drawContext.drawTexture(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 8.0F, 8.0F, size, size, 8, 8, 64, 64);
-        drawContext.drawTexture(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 40.0F, 8.0F, size, size, 8, 8, 64, 64);
+        drawContext.blit(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 8.0F, 8.0F, size, size, 8, 8, 64, 64);
+        drawContext.blit(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 40.0F, 8.0F, size, size, 8, 8, 64, 64);
     }
 
     @Override
@@ -80,15 +80,15 @@ public class UIWelcomeFarewellSlide extends UIElement
         topY += badgeH + 8;
 
         /* 3. Personalized Player Greeting with Avatar */
-        MinecraftClient mc = MinecraftClient.getInstance();
-        String username = mc.player != null ? mc.player.getGameProfile().name() : mc.getSession().getUsername();
+        Minecraft mc = Minecraft.getInstance();
+        String username = mc.player != null ? mc.player.getGameProfile().name() : mc.getUser().getName();
         Identifier skinTexture = null;
 
         if (mc.player != null)
         {
             try
             {
-                skinTexture = mc.getSkinProvider().supplySkinTextures(mc.player.getGameProfile(), true).get().body().id();
+                skinTexture = mc.getSkinManager().createLookup(mc.player.getGameProfile(), true).get().body().id();
             }
             catch (Exception e)
             {}
