@@ -165,7 +165,8 @@ public class UINostalgicBackground
         float timeSec = (now % 10000000L) / 1000F;
 
         Matrix4f mat = context.batcher.getContext().getMatrices().peek().getPositionMatrix();
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tessellator.getInstance().getBuffer();
+        builder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
         /* 1. Deep Cosmic Void Background */
         this.renderCosmicVoid(builder, mat, area, energy);
@@ -498,26 +499,26 @@ public class UINostalgicBackground
 
     private static void pushQuad(BufferBuilder builder, Matrix4f mat, float x, float y, float w, float h, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        builder.vertex(mat, x, y, 0).color(cTopLeft);
-        builder.vertex(mat, x, y + h, 0).color(cBotLeft);
-        builder.vertex(mat, x + w, y + h, 0).color(cBotRight);
-        builder.vertex(mat, x + w, y, 0).color(cTopRight);
+        builder.vertex(mat, x, y, 0).color(cTopLeft).next();
+        builder.vertex(mat, x, y + h, 0).color(cBotLeft).next();
+        builder.vertex(mat, x + w, y + h, 0).color(cBotRight).next();
+        builder.vertex(mat, x + w, y, 0).color(cTopRight).next();
     }
 
     private static void pushQuadPoints(BufferBuilder builder, Matrix4f mat, float x1, float y1, float x2, float y2, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        builder.vertex(mat, x1, y1, 0).color(cTopLeft);
-        builder.vertex(mat, x1, y2, 0).color(cBotLeft);
-        builder.vertex(mat, x2, y2, 0).color(cBotRight);
-        builder.vertex(mat, x2, y1, 0).color(cTopRight);
+        builder.vertex(mat, x1, y1, 0).color(cTopLeft).next();
+        builder.vertex(mat, x1, y2, 0).color(cBotLeft).next();
+        builder.vertex(mat, x2, y2, 0).color(cBotRight).next();
+        builder.vertex(mat, x2, y1, 0).color(cTopRight).next();
     }
 
     private static void pushQuadSkewed(BufferBuilder builder, Matrix4f mat, float xTL, float yTL, float xTR, float yTR, float xBL, float yBL, float xBR, float yBR, int cTL, int cTR, int cBL, int cBR)
     {
-        builder.vertex(mat, xTL, yTL, 0).color(cTL);
-        builder.vertex(mat, xBL, yBL, 0).color(cBL);
-        builder.vertex(mat, xBR, yBR, 0).color(cBR);
-        builder.vertex(mat, xTR, yTR, 0).color(cTR);
+        builder.vertex(mat, xTL, yTL, 0).color(cTL).next();
+        builder.vertex(mat, xBL, yBL, 0).color(cBL).next();
+        builder.vertex(mat, xBR, yBR, 0).color(cBR).next();
+        builder.vertex(mat, xTR, yTR, 0).color(cTR).next();
     }
 
     private static void pushSmoothRadialGlow(BufferBuilder builder, Matrix4f mat, float cx, float cy, float radius, int centerColor)
