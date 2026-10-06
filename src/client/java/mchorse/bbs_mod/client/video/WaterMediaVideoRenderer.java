@@ -3,6 +3,7 @@ package mchorse.bbs_mod.client.video;
 import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.misc.VideoOverlay;
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.utils.Area;
@@ -400,7 +401,7 @@ public class WaterMediaVideoRenderer
         buffer.vertex(matrix, drawX + drawW, drawY + drawH, 0).texture(u1, v1);
         buffer.vertex(matrix, drawX + drawW, drawY, 0).texture(u1, v0);
         buffer.vertex(matrix, drawX, drawY, 0).texture(u0, v0);
-        mchorse.bbs_mod.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
+        BufferRenderer.drawWithGlobalProgram(buffer.end());
 
         BBSRendering.enableCull();
         BBSRendering.depthMask(true);

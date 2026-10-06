@@ -12,8 +12,6 @@ import net.minecraft.client.util.math.MatrixStack;
 
 import org.joml.Matrix4f;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-
 import java.util.function.Consumer;
 
 /**

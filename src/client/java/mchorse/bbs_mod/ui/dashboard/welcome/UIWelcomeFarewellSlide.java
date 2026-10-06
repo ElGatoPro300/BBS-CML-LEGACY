@@ -11,6 +11,7 @@ import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.colors.Colors;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
 
@@ -30,8 +31,8 @@ public class UIWelcomeFarewellSlide extends UIElement
 
     private void drawPlayerHead(DrawContext drawContext, Identifier skinTexture, int x, int y, int size)
     {
-        drawContext.drawTexture(skinTexture, x, y, size, size, 8.0F, 8.0F, 8, 8, 64, 64);
-        drawContext.drawTexture(skinTexture, x, y, size, size, 40.0F, 8.0F, 8, 8, 64, 64);
+        drawContext.drawTexture(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 8.0F, 8.0F, size, size, 8, 8, 64, 64);
+        drawContext.drawTexture(RenderPipelines.GUI_TEXTURED, skinTexture, x, y, 40.0F, 8.0F, size, size, 8, 8, 64, 64);
     }
 
     @Override
@@ -80,14 +81,14 @@ public class UIWelcomeFarewellSlide extends UIElement
 
         /* 3. Personalized Player Greeting with Avatar */
         MinecraftClient mc = MinecraftClient.getInstance();
-        String username = mc.player != null ? mc.player.getGameProfile().getName() : mc.getSession().getUsername();
+        String username = mc.player != null ? mc.player.getGameProfile().name() : mc.getSession().getUsername();
         Identifier skinTexture = null;
 
         if (mc.player != null)
         {
             try
             {
-                skinTexture = mc.getSkinProvider().getSkinTextures(mc.player.getGameProfile()).texture();
+                skinTexture = mc.getSkinProvider().supplySkinTextures(mc.player.getGameProfile(), true).get().body().id();
             }
             catch (Exception e)
             {}

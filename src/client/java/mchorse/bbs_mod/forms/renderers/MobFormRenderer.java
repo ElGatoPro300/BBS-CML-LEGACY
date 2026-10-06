@@ -32,11 +32,9 @@ import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.Transform;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.network.OtherClientPlayerEntity;
-import net.minecraft.client.render.DiffuseLighting;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.command.RenderDispatcher;
 import net.minecraft.client.render.entity.EntityRenderManager;
@@ -67,7 +65,6 @@ import net.minecraft.util.math.RotationAxis;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import com.mojang.authlib.GameProfile;
