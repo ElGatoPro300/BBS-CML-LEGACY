@@ -17,7 +17,6 @@ import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
 import mchorse.bbs_mod.ui.framework.elements.utils.UILabel;
 import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.UIUtils;
-import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.colors.Colors;
 
 import net.minecraft.client.util.math.MatrixStack;
@@ -672,4 +671,3 @@ public class UIWelcomeLayoutSlide extends UIElement
         }
     }
 }
-
