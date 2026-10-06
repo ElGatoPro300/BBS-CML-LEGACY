@@ -2345,7 +2345,35 @@ public class UIKeys
     public static final IKey CAMERA_TIMELINE_CLIPS_TABS_ANCHOR = L10n.lang("bbs.ui.camera.clips.tabs.anchor");
     public static final IKey CAMERA_TIMELINE_CLIPS_TABS_EXTRAS = L10n.lang("bbs.ui.camera.clips.tabs.extras");
 
-    /* Welcome Panel */
+    /* Welcome Panel & Farewell Experience */
+    public static final IKey WELCOME_INTRO_QUOTE = L10n.lang("bbs.welcome.intro_quote");
+    public static final IKey WELCOME_INTRO_SKIP = L10n.lang("bbs.welcome.intro_skip");
+    public static final IKey WELCOME_REPLAY_INTRO = L10n.lang("bbs.welcome.replay_intro");
+    public static final IKey WELCOME_FAREWELL_TITLE = L10n.lang("bbs.welcome.farewell.title");
+    public static final IKey WELCOME_FAREWELL_SUBTITLE = L10n.lang("bbs.welcome.farewell.subtitle");
+    public static final IKey WELCOME_FAREWELL_DESC = L10n.lang("bbs.welcome.farewell.desc");
+    public static final IKey WELCOME_THEME_TITLE = L10n.lang("bbs.welcome.theme.title");
+    public static final IKey WELCOME_THEME_SUBTITLE = L10n.lang("bbs.welcome.theme.subtitle");
+    public static final IKey WELCOME_THEME_PRIMARY = L10n.lang("bbs.welcome.theme.primary");
+    public static final IKey WELCOME_PRESET_NOSTALGIC = L10n.lang("bbs.welcome.preset.nostalgic");
+    public static final IKey WELCOME_PRESET_DARK = L10n.lang("bbs.welcome.preset.dark");
+    public static final IKey WELCOME_PRESET_LIGHT = L10n.lang("bbs.welcome.preset.light");
+    public static final IKey WELCOME_PRESET_CYAN = L10n.lang("bbs.welcome.preset.cyan");
+    public static final IKey WELCOME_FFMPEG_TITLE = L10n.lang("bbs.welcome.ffmpeg.title");
+    public static final IKey WELCOME_FFMPEG_SUBTITLE = L10n.lang("bbs.welcome.ffmpeg.subtitle");
+    public static final IKey WELCOME_FFMPEG_FOUND = L10n.lang("bbs.welcome.ffmpeg.found");
+    public static final IKey WELCOME_FFMPEG_NOT_FOUND = L10n.lang("bbs.welcome.ffmpeg.not_found");
+    public static final IKey WELCOME_FFMPEG_PICK = L10n.lang("bbs.welcome.ffmpeg.pick");
+    public static final IKey WELCOME_TUTORIALS = L10n.lang("bbs.welcome.tutorials");
+    public static final IKey WELCOME_COMMUNITY_TITLE = L10n.lang("bbs.welcome.community.title");
+    public static final IKey WELCOME_COMMUNITY_SUBTITLE = L10n.lang("bbs.welcome.community.subtitle");
+    public static final IKey WELCOME_DISCORD = L10n.lang("bbs.welcome.discord");
+    public static final IKey WELCOME_WIKI = L10n.lang("bbs.welcome.wiki");
+    public static final IKey WELCOME_YOUTUBE = L10n.lang("bbs.welcome.youtube");
+    public static final IKey WELCOME_CML3_INFO = L10n.lang("bbs.welcome.cml3_info");
+    public static final IKey WELCOME_KEYBINDS_HINT = L10n.lang("bbs.welcome.keybinds_hint");
+    public static final IKey WELCOME_START_STUDIO = L10n.lang("bbs.welcome.start_studio");
+
     public static final IKey WELCOME_TITLE1 = L10n.lang("bbs.welcome.title1");
     public static final IKey WELCOME_TITLE2 = L10n.lang("bbs.welcome.title2");
     public static final IKey WELCOME_SUBTITLE = L10n.lang("bbs.welcome.subtitle");

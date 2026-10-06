@@ -24,6 +24,7 @@ import mchorse.bbs_mod.ui.dashboard.textures.UITextureManagerPanel;
 import mchorse.bbs_mod.ui.dashboard.utils.UIGraphPanel;
 import mchorse.bbs_mod.ui.dashboard.utils.UIOrbitCamera;
 import mchorse.bbs_mod.ui.dashboard.utils.UIOrbitCameraKeys;
+import mchorse.bbs_mod.ui.dashboard.welcome.UIWelcomeOverlayPanel;
 import mchorse.bbs_mod.ui.film.UIFilmPanel;
 import mchorse.bbs_mod.ui.film.UIWorldFilmsBrowserPanel;
 import mchorse.bbs_mod.ui.framework.UIBaseMenu;
@@ -131,9 +132,9 @@ public class UIDashboard extends UIBaseMenu
         this.getRoot().add(this.orbitKeysUI);
         this.getRoot().add(this.chalkboard);
 
-        if (!BBSSettings.welcomePanelSeen21.get())
+        if (!BBSSettings.welcomeFarewellSeen.get())
         {
-            UIWelcomePanel welcome = new UIWelcomePanel();
+            UIWelcomeOverlayPanel welcome = new UIWelcomeOverlayPanel();
             welcome.full(this.getRoot());
             this.getRoot().add(welcome);
         }
