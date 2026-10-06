@@ -87,7 +87,7 @@ public class UIWelcomeFarewellSlide extends UIElement
         {
             try
             {
-                skinTexture = mc.getSkinProvider().getSkinTextures(mc.player.getGameProfile()).texture();
+                skinTexture = mc.player.getSkinTexture();
             }
             catch (Exception e)
             {}
