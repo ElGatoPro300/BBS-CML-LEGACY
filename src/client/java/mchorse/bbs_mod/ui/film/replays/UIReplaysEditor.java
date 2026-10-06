@@ -27,6 +27,7 @@ import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.Form;
+import mchorse.bbs_mod.forms.forms.FramebufferForm;
 import mchorse.bbs_mod.forms.forms.LabelForm;
 import mchorse.bbs_mod.forms.forms.MobForm;
 import mchorse.bbs_mod.forms.forms.ModelForm;
@@ -3346,7 +3347,7 @@ public class UIReplaysEditor extends UIElement implements GizmoSurface
         if (FormProperties.isFramebufferResolutionChannelKey(path)
             || FormProperties.isFramebufferViewExtentChannelKey(path))
         {
-            return FormProperties.formForFramebufferSynthetic(rootForm, path) instanceof mchorse.bbs_mod.forms.forms.FramebufferForm;
+            return FormProperties.formForFramebufferSynthetic(rootForm, path) instanceof FramebufferForm;
         }
 
         BaseValueBasic property = FormUtils.getProperty(rootForm, path);
