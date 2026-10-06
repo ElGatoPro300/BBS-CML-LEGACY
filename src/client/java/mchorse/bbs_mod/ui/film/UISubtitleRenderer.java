@@ -4,6 +4,7 @@ import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.clips.misc.Subtitle;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.screen.ColorGradeRenderer;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.graphics.Framebuffer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.resources.Link;
@@ -52,9 +53,9 @@ public class UISubtitleRenderer
         });
     }
 
-    public static void renderSubtitles(MatrixStack stack, Batcher2D batcher, List<Subtitle> subtitles)
+    public static void renderSubtitles(MatrixStack stack, Batcher2D batcher, List<Subtitle> subtitles, int frameW, int frameH)
     {
-        if (subtitles.isEmpty())
+        if (subtitles.isEmpty() || frameW <= 0 || frameH <= 0)
         {
             return;
         }
@@ -65,8 +66,7 @@ public class UISubtitleRenderer
         Supplier<ShaderProgram> supplier = () -> program;
 
         net.minecraft.client.gl.Framebuffer fb = MinecraftClient.getInstance().getFramebuffer();
-        int width = fb.textureWidth;
-        int height = fb.textureHeight;
+        float layoutScale = ScreenOverlayLayout.resolutionScale(frameW, frameH);
 
         /* Text-atlas FBO applyClear() shrinks glViewport; beginWrite(false) alone may not
          * restore it (same class of bug as UIFilmController stencil picking). Save so
@@ -77,12 +77,9 @@ public class UISubtitleRenderer
 
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
 
-        width /= 2;
-        height /= 2;
-
         Framebuffer framebuffer = getTextFramebuffer();
         Texture texture = framebuffer.getMainTexture();
-        Matrix4f ortho = new Matrix4f().ortho(0, width, height, 0, -100, 100);
+        Matrix4f ortho = new Matrix4f().ortho(0, frameW, frameH, 0, -100, 100);
         FontRenderer font = Batcher2D.getVanillaTextRenderer();
         TextRenderer vanilla = MinecraftClient.getInstance().textRenderer;
 
@@ -114,9 +111,11 @@ public class UISubtitleRenderer
             String label = StringUtils.processColoredText(subtitle.label);
             float w = 0;
             float h = 0;
-            int x = (int) (width * subtitle.windowX + subtitle.x);
-            int y = (int) (height * subtitle.windowY + subtitle.y);
-            float scale = subtitle.size;
+            int x = Math.round(ScreenOverlayLayout.posX(frameW, subtitle.windowX, subtitle.x, layoutScale));
+            int y = Math.round(ScreenOverlayLayout.posY(frameH, subtitle.windowY, subtitle.y, layoutScale));
+            /* Bake at authored size, then place with layout scale so text keeps reference proportions. */
+            float bakeScale = subtitle.size;
+            float placeScale = layoutScale;
             int subColor = subtitle.color;
             int wrapWidth = Math.max(0, Math.round(subtitle.maxWidth));
 
@@ -129,15 +128,17 @@ public class UISubtitleRenderer
 
             h = (strings.size() - 1) * subtitle.lineHeight + vanilla.fontHeight - 2;
 
-            int fw = (int) ((w + 10) * scale);
-            int fh = (int) ((h + 10) * scale);
+            int fw = (int) ((w + 10) * bakeScale);
+            int fh = (int) ((h + 10) * bakeScale);
+            int drawW = Math.max(1, Math.round(fw * placeScale));
+            int drawH = Math.max(1, Math.round(fh * placeScale));
 
             if (fw <= 0 || fh <= 0)
             {
                 continue;
             }
 
-            RenderSystem.setProjectionMatrix(new Matrix4f().ortho(0, w + 10, 0, h + 10, -100, 100), VertexSorter.BY_Z);
+            RenderSystem.setProjectionMatrix(new Matrix4f().ortho(0, w + 10, 0, h + 10, -100, 100), VertexSorter.BY_Z); /* bake space */
 
             framebuffer.resize(fw, fh);
             /* Transparent clear — opaque world clear-color would show as a black plate
@@ -212,7 +213,7 @@ public class UISubtitleRenderer
             RenderSystem.enableBlend();
             RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
-            batcher.texturedBox(supplier, texture.id, Colors.setA(Colors.WHITE, alpha), -fw * subtitle.anchorX, -fh * subtitle.anchorY, texture.width, texture.height, 0, 0, texture.width, texture.height, texture.width, texture.height);
+            batcher.texturedBox(supplier, texture.id, Colors.setA(Colors.WHITE, alpha), -drawW * subtitle.anchorX, -drawH * subtitle.anchorY, drawW, drawH, 0, 0, texture.width, texture.height, texture.width, texture.height);
 
             stack.pop();
         }
@@ -230,13 +231,13 @@ public class UISubtitleRenderer
         RenderSystem.enableCull();
     }
 
-    public static void renderSubtitle(MatrixStack stack, Batcher2D batcher, Subtitle subtitle)
+    public static void renderSubtitle(MatrixStack stack, Batcher2D batcher, Subtitle subtitle, int frameW, int frameH)
     {
         if (subtitle == null)
         {
             return;
         }
 
-        renderSubtitles(stack, batcher, Collections.singletonList(subtitle));
+        renderSubtitles(stack, batcher, Collections.singletonList(subtitle), frameW, frameH);
     }
 }

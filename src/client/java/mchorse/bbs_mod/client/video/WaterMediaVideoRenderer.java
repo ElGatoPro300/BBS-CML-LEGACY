@@ -3,6 +3,7 @@ package mchorse.bbs_mod.client.video;
 import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.misc.VideoOverlay;
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.utils.Area;
@@ -74,42 +75,9 @@ public class WaterMediaVideoRenderer
             return;
         }
 
-        Area baseArea = area;
-        int actualW = getVideoWidth(video.video.get());
-        int actualH = getVideoHeight(video.video.get());
-
-        int baseW = baseArea.w;
-        int baseH = baseArea.h;
-
-        if (actualW > 0 && actualH > 0)
-        {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) baseArea.w / baseArea.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (baseArea.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (baseArea.h * videoAspect);
-            }
-        }
-
-        float widthPercent = video.width.get() / 100F;
-        float heightPercent = video.height.get() / 100F;
-
-        if (video.width.get() == 0 && video.height.get() == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-
-        int vx = baseArea.x + (baseArea.w - vw) / 2 + video.x.get();
-        int vy = baseArea.y + (baseArea.h - vh) / 2 + video.y.get();
+        int[] rect = layoutVideoRect(area.x, area.y, area.w, area.h,
+            video.width.get(), video.height.get(), video.x.get(), video.y.get(),
+            video.video.get());
 
         batcher.flush();
 
@@ -118,7 +86,7 @@ public class WaterMediaVideoRenderer
             tick - Math.round(video.tick.get()) + video.offset.get(),
             isRunning,
             video.volume.get(),
-            vx, vy, vw, vh, video.opacity.get(),
+            rect[0], rect[1], rect[2], rect[3], video.opacity.get(),
             video.cropX.get(), video.cropY.get(), video.cropWidth.get(), video.cropHeight.get(),
             video.loops.get());
     }
@@ -159,39 +127,8 @@ public class WaterMediaVideoRenderer
             return;
         }
 
-        int actualW = getVideoWidth(overlay.path);
-        int actualH = getVideoHeight(overlay.path);
-        int baseW = viewport.w;
-        int baseH = viewport.h;
-
-        if (actualW > 0 && actualH > 0)
-        {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) viewport.w / viewport.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (viewport.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (viewport.h * videoAspect);
-            }
-        }
-
-        float widthPercent = overlay.width / 100F;
-        float heightPercent = overlay.height / 100F;
-
-        if (overlay.width == 0 && overlay.height == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-        int vx = viewport.x + (viewport.w - vw) / 2 + overlay.x;
-        int vy = viewport.y + (viewport.h - vh) / 2 + overlay.y;
+        int[] rect = layoutVideoRect(viewport.x, viewport.y, viewport.w, viewport.h,
+            overlay.width, overlay.height, overlay.x, overlay.y, overlay.path);
 
         batcher.clip(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
         render(stack,
@@ -199,7 +136,7 @@ public class WaterMediaVideoRenderer
             overlay.videoTick,
             isRunning,
             overlay.volume,
-            vx, vy, vw, vh, overlay.opacity,
+            rect[0], rect[1], rect[2], rect[3], overlay.opacity,
             overlay.cropX, overlay.cropY, overlay.cropWidth, overlay.cropHeight,
             overlay.loops);
         batcher.unclip(screenWidth, screenHeight);
@@ -207,41 +144,13 @@ public class WaterMediaVideoRenderer
 
     private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
     {
-        int actualW = getVideoWidth(video.video.get());
-        int actualH = getVideoHeight(video.video.get());
-
-        int baseW = baseArea.w;
-        int baseH = baseArea.h;
-
-        if (actualW > 0 && actualH > 0)
-        {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) baseArea.w / baseArea.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (baseArea.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (baseArea.h * videoAspect);
-            }
-        }
-
-        float widthPercent = video.width.get() / 100F;
-        float heightPercent = video.height.get() / 100F;
-
-        if (video.width.get() == 0 && video.height.get() == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-
-        int vx = baseArea.x + (baseArea.w - vw) / 2 + video.x.get();
-        int vy = baseArea.y + (baseArea.h - vh) / 2 + video.y.get();
+        int[] rect = layoutVideoRect(baseArea.x, baseArea.y, baseArea.w, baseArea.h,
+            video.width.get(), video.height.get(), video.x.get(), video.y.get(),
+            video.video.get());
+        int vx = rect[0];
+        int vy = rect[1];
+        int vw = rect[2];
+        int vh = rect[3];
 
         if (!global)
         {
@@ -279,6 +188,60 @@ public class WaterMediaVideoRenderer
                 batcher.unclip(screenWidth, screenHeight);
             }
         }
+    }
+
+    /**
+     * Layout video into {@code area} using the shared 1920×1080 overlay reference.
+     * Both size axes 0 = contain (video aspect) inside the area; otherwise W%/H% and
+     * pixel offsets are reference-space values scaled with {@link ScreenOverlayLayout}.
+     *
+     * @return {@code {vx, vy, vw, vh}}
+     */
+    private static int[] layoutVideoRect(int areaX, int areaY, int areaW, int areaH,
+        float widthPercent100, float heightPercent100, float offsetX, float offsetY, String videoPath)
+    {
+        float scale = ScreenOverlayLayout.resolutionScale(areaW, areaH);
+        int vw;
+        int vh;
+
+        if (widthPercent100 == 0F && heightPercent100 == 0F)
+        {
+            int actualW = getVideoWidth(videoPath);
+            int actualH = getVideoHeight(videoPath);
+            int baseW = areaW;
+            int baseH = areaH;
+
+            if (actualW > 0 && actualH > 0)
+            {
+                float videoAspect = (float) actualW / actualH;
+                float areaAspect = (float) areaW / areaH;
+
+                if (videoAspect > areaAspect)
+                {
+                    baseH = Math.round(areaW / videoAspect);
+                }
+                else
+                {
+                    baseW = Math.round(areaH * videoAspect);
+                }
+            }
+
+            vw = baseW;
+            vh = baseH;
+        }
+        else
+        {
+            float widthPercent = widthPercent100 / 100F;
+            float heightPercent = heightPercent100 / 100F;
+
+            vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(ScreenOverlayLayout.sizeX(Math.abs(widthPercent), scale))) * (widthPercent < 0F ? -1 : 1);
+            vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(ScreenOverlayLayout.sizeY(Math.abs(heightPercent), scale))) * (heightPercent < 0F ? -1 : 1);
+        }
+
+        int vx = areaX + (areaW - vw) / 2 + Math.round(offsetX * scale);
+        int vy = areaY + (areaH - vh) / 2 + Math.round(offsetY * scale);
+
+        return new int[] {vx, vy, vw, vh};
     }
 
     private static String resolveVideoPath(String path)

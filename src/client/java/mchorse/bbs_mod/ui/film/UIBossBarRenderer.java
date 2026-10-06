@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.ui.film;
 
 import mchorse.bbs_mod.camera.clips.misc.BossBarState;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 
 import net.minecraft.client.gui.DrawContext;
@@ -14,8 +15,6 @@ import java.util.List;
 
 public class UIBossBarRenderer
 {
-    private static final float REFERENCE_WIDTH = 1920F;
-    private static final float REFERENCE_HEIGHT = 1080F;
     private static final int BASE_BAR_WIDTH = 182;
     private static final int BASE_BAR_HEIGHT = 5;
     private static final int TEXT_GAP = 2;
@@ -29,7 +28,7 @@ public class UIBossBarRenderer
             return;
         }
 
-        float resolutionScale = getResolutionScale(width, height);
+        float resolutionScale = ScreenOverlayLayout.resolutionScale(width, height);
 
         for (BossBarState bossBar : bossBars)
         {
@@ -39,7 +38,7 @@ public class UIBossBarRenderer
 
     public static void renderBossBar(MatrixStack stack, Batcher2D batcher, BossBarState bossBar, int originX, int originY, int width, int height)
     {
-        renderBossBar(stack, batcher, bossBar, originX, originY, width, height, getResolutionScale(width, height));
+        renderBossBar(stack, batcher, bossBar, originX, originY, width, height, ScreenOverlayLayout.resolutionScale(width, height));
     }
 
     private static void renderBossBar(MatrixStack stack, Batcher2D batcher, BossBarState bossBar, int originX, int originY, int width, int height, float resolutionScale)
@@ -135,16 +134,6 @@ public class UIBossBarRenderer
     {
         context.setShaderColor(red, green, blue, alpha);
         RenderSystem.setShaderColor(red, green, blue, alpha);
-    }
-
-    private static float getResolutionScale(int width, int height)
-    {
-        if (width <= 0 || height <= 0)
-        {
-            return 1F;
-        }
-
-        return Math.max(0.05F, Math.min(width / REFERENCE_WIDTH, height / REFERENCE_HEIGHT));
     }
 
     private static int applyAlpha(int color, float alpha)

@@ -3,14 +3,13 @@ package mchorse.bbs_mod.ui.film;
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.clips.misc.ImageOverlay;
 import mchorse.bbs_mod.client.BBSShaders;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.forms.renderers.utils.FormTextureBlendRenderer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.utils.Quad;
 import mchorse.bbs_mod.utils.colors.Color;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.GameRenderer;
@@ -35,21 +34,19 @@ public class UIImageRenderer
     private static final Quad uvQuad = new Quad();
     private static final Matrix4f matrix = new Matrix4f();
 
-    public static void renderImages(MatrixStack stack, Batcher2D batcher, List<ImageOverlay> images)
+    public static void renderImages(MatrixStack stack, Batcher2D batcher, List<ImageOverlay> images, int frameW, int frameH)
     {
-        if (images.isEmpty())
+        if (images.isEmpty() || frameW <= 0 || frameH <= 0)
         {
             return;
         }
 
-        Framebuffer fb = MinecraftClient.getInstance().getFramebuffer();
-        int width = fb.textureWidth / 2;
-        int height = fb.textureHeight / 2;
+        float scale = ScreenOverlayLayout.resolutionScale(frameW, frameH);
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
         /* X/Y rotations move quad corners into Z. The old ±100 near/far clipped
          * those sides as angle increased; size the depth range for screen-scale quads. */
-        float zExtent = Math.max(1000F, Math.max(width, height) * 8F);
-        Matrix4f ortho = new Matrix4f().ortho(0, width, height, 0, -zExtent, zExtent);
+        float zExtent = Math.max(1000F, Math.max(frameW, frameH) * 8F);
+        Matrix4f ortho = new Matrix4f().ortho(0, frameW, frameH, 0, -zExtent, zExtent);
 
         RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
@@ -68,16 +65,16 @@ public class UIImageRenderer
             float heightPercent = overlay.height / 100F;
             /* Keep sub-pixel size so width/height keyframes interpolate smoothly
              * instead of stair-stepping on whole pixels (worse over long spans). */
-            float fw = widthPercent == 0F ? 0F : width * widthPercent;
-            float fh = heightPercent == 0F ? 0F : height * heightPercent;
+            float fw = widthPercent == 0F ? 0F : ScreenOverlayLayout.sizeX(widthPercent, scale);
+            float fh = heightPercent == 0F ? 0F : ScreenOverlayLayout.sizeY(heightPercent, scale);
 
             if (fw == 0F || fh == 0F)
             {
                 continue;
             }
 
-            float x = width * overlay.windowX + overlay.x;
-            float y = height * overlay.windowY + overlay.y;
+            float x = ScreenOverlayLayout.posX(frameW, overlay.windowX, overlay.x, scale);
+            float y = ScreenOverlayLayout.posY(frameH, overlay.windowY, overlay.y, scale);
 
             FormTextureBlendRenderer.draw(overlay.textureBlend, overlay.texture, (link, alphaFactor) ->
             {
@@ -180,14 +177,14 @@ public class UIImageRenderer
         RenderSystem.enableCull();
     }
 
-    public static void renderImage(MatrixStack stack, Batcher2D batcher, ImageOverlay overlay)
+    public static void renderImage(MatrixStack stack, Batcher2D batcher, ImageOverlay overlay, int frameW, int frameH)
     {
         if (overlay == null)
         {
             return;
         }
 
-        renderImages(stack, batcher, Collections.singletonList(overlay));
+        renderImages(stack, batcher, Collections.singletonList(overlay), frameW, frameH);
     }
 
     private static float[] computeUV(ImageOverlay overlay, Texture texture)

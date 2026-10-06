@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.ui.film;
 
 import mchorse.bbs_mod.camera.clips.misc.HotbarState;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 
 import net.minecraft.client.MinecraftClient;
@@ -19,8 +20,6 @@ import java.util.Random;
 
 public class UIHotbarRenderer
 {
-    private static final float REFERENCE_WIDTH = 1920F;
-    private static final float REFERENCE_HEIGHT = 1080F;
     private static final int HUD_GREEN = 8453920;
     private static final int BAR_ICON_Y = -17;
     private static final int EXPERIENCE_BAR_Y = -7;
@@ -108,7 +107,7 @@ public class UIHotbarRenderer
             return;
         }
 
-        float resolutionScale = getResolutionScale(width, height);
+        float resolutionScale = ScreenOverlayLayout.resolutionScale(width, height);
         float scale = Math.max(0.05F, hotbar.scale) * resolutionScale;
         int hotbarWidth = 182;
         int x = originX + Math.round(width / 2F + hotbar.x * resolutionScale - hotbarWidth / 2F);
@@ -314,16 +313,6 @@ public class UIHotbarRenderer
 
         stack.pop();
         batcher.flush();
-    }
-
-    private static float getResolutionScale(int width, int height)
-    {
-        if (width <= 0 || height <= 0)
-        {
-            return 1F;
-        }
-
-        return Math.max(0.05F, Math.min(width / REFERENCE_WIDTH, height / REFERENCE_HEIGHT));
     }
 
     private static void renderBar(Batcher2D batcher, float value, Identifier empty, Identifier half, Identifier full, int x, int y, int slots, Random lowHealthShakeRandom, int regenerationHeartIndex)

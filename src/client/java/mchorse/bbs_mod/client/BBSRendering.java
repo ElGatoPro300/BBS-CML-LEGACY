@@ -909,12 +909,16 @@ public class BBSRendering
                 DrawContext drawContext = new DrawContext(mc, mc.getBufferBuilders().getEntityVertexConsumers());
                 Batcher2D offscreenBatcher = new Batcher2D(drawContext);
 
-                Window window = mc.getWindow();
+                /* Use export/video size, not window scaled size: after renderingWorld=false,
+                 * WindowMixin no longer spoofs dimensions, so landscape window ortho into a
+                 * portrait export FBO would stretch Hotbar/BossBar (and similar) overlays. */
+                int screenW = getVideoWidth();
+                int screenH = getVideoHeight();
                 Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
-                Matrix4f ortho = new Matrix4f().ortho(0, window.getScaledWidth(), window.getScaledHeight(), 0, -1000, 3000);
+                Matrix4f ortho = new Matrix4f().ortho(0, screenW, screenH, 0, -1000, 3000);
 
                 RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
-                ScreenEffectRenderer.render(offscreenBatcher, panel.getRunner().getContext(), window.getScaledWidth(), window.getScaledHeight());
+                ScreenEffectRenderer.render(offscreenBatcher, panel.getRunner().getContext(), screenW, screenH);
 
                 RenderSystem.setProjectionMatrix(cache, VertexSorter.BY_Z);
             }
