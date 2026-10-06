@@ -40,3 +40,13 @@ Deep-dives extracted from the Cursor project map. The always-on agent index live
 * `AGENTS.md`, `CONTRIBUTING.md`
 * User wiki: `bbs-mod-wiki.wiki/`
 * Greenfield rewrite (3.0): [BBS-CML-3.0](https://github.com/ElGatoPro300/BBS-CML-3.0) — bootstrap / code-organization live **there**, not in this folder (older UI-redesign migration drafts were removed from 2.2).
+
+## 3.0 planning (still parked here)
+
+| Doc | Topic |
+|-----|--------|
+| [ik-physics-3.0-master-plan.md](ik-physics-3.0-master-plan.md) | IK/physics master plan deferred from 2.2 (Option C′, UI, `bbs_physics`, phases, git markers) |
+| [framebuffer-lookat-3.0-master-plan.md](framebuffer-lookat-3.0-master-plan.md) | Framebuffer Billboard + Camera content past ±90° pitch (continuous up + quaternion face-camera) |
+
+Plans for **bone remap** and **Color Masks redesign** live in the 3.0 repo under [`docs/architecture/`](https://github.com/ElGatoPro300/BBS-CML-3.0/tree/master/docs/architecture).
+

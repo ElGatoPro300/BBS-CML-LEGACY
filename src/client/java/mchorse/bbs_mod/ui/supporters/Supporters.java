@@ -16,6 +16,7 @@ public class Supporters
         /* Developers of BBS CML */
         this.add("Discord", "https://discord.gg/MAHVQBSce6", "textures/banners/CML.png").withDate(12, 1);
         this.add("ElGatoPro300", "https://www.youtube.com/@ElGatoPro300", "textures/banners/ElGatoPro300.png").withDate(12, 1);
+        this.add("El_Redstoniano", "https://www.youtube.com/@ElRedstoniano", "textures/banners/El_Redstoniano.png").withDate(12, 1);
         this.add("SIRSYP", "https://www.youtube.com/@SIRSYP1", "textures/banners/SIRSYP.png").withDate(12, 1);
 
         /* Founders of BBS CML */
@@ -71,7 +72,7 @@ public class Supporters
 
     public List<Supporter> getCCSupporters()
     {
-        return this.supporters.stream().filter(Supporter::hasBanner).filter(s -> !s.name.equals("Discord") && !s.name.equals("ElGatoPro300") && !s.name.equals("seb024xd") && !s.name.equals("Diobede") && !s.name.equals("TobbyMC") && !s.name.equals("JaviCubito") && !s.name.equals("SEKZA_MC") && !s.name.equals("Jesuluto") && !s.name.equals("Kazu_MC") && !s.name.equals("SoyTon") && !s.name.equals("TheRocket") && !s.name.equals("AND_010") && !s.name.equals("Mattux") && !s.name.equals("SR400X") && !s.name.equals("MrJack") && !s.name.equals("Yeyo Sin Contexto") && !s.name.equals("Redbirdpro") && !s.name.equals("MiniSunn_") && !s.name.equals("lolinmalo") && !s.name.equals("ItzUkyo2013") && !s.name.equals("SoyFrann") && !s.name.equals("AymaWolf Omega") && !s.name.equals("Mokaccino") && !s.name.equals("itzPizzaXD") && !s.name.equals("Pirata_12") && !s.name.equals("Alabi Pictures") && !s.name.equals("McHorse") && !s.name.equals("Nioum") && !s.name.equals("FunkyFight") && !s.name.equals("Afegor (Alyokhin Dmitrii)") && !s.name.equals("Fanyel") && !s.name.equals("bay4lly") && !s.name.equals("SIRSYP") && !s.name.equals("Plixitizthz") && !s.name.equals("Soru San") && !s.name.equals("SERGIO PLAYER") && !s.name.equals("Gooxy Series") && !s.name.equals("ElRandi") ).sorted(Comparator.comparing((a) -> a.date)).collect(Collectors.toList());
+        return this.supporters.stream().filter(Supporter::hasBanner).filter(s -> !s.name.equals("Discord") && !s.name.equals("ElGatoPro300") && !s.name.equals("El_Redstoniano") && !s.name.equals("seb024xd") && !s.name.equals("Diobede") && !s.name.equals("TobbyMC") && !s.name.equals("JaviCubito") && !s.name.equals("SEKZA_MC") && !s.name.equals("Jesuluto") && !s.name.equals("Kazu_MC") && !s.name.equals("SoyTon") && !s.name.equals("TheRocket") && !s.name.equals("AND_010") && !s.name.equals("Mattux") && !s.name.equals("SR400X") && !s.name.equals("MrJack") && !s.name.equals("Yeyo Sin Contexto") && !s.name.equals("Redbirdpro") && !s.name.equals("MiniSunn_") && !s.name.equals("lolinmalo") && !s.name.equals("ItzUkyo2013") && !s.name.equals("SoyFrann") && !s.name.equals("AymaWolf Omega") && !s.name.equals("Mokaccino") && !s.name.equals("itzPizzaXD") && !s.name.equals("Pirata_12") && !s.name.equals("Alabi Pictures") && !s.name.equals("McHorse") && !s.name.equals("Nioum") && !s.name.equals("FunkyFight") && !s.name.equals("Afegor (Alyokhin Dmitrii)") && !s.name.equals("Fanyel") && !s.name.equals("bay4lly") && !s.name.equals("SIRSYP") && !s.name.equals("Plixitizthz") && !s.name.equals("Soru San") && !s.name.equals("SERGIO PLAYER") && !s.name.equals("Gooxy Series") && !s.name.equals("ElRandi") && !s.name.equals("EL_Redstoniano")).sorted(Comparator.comparing((a) -> a.date)).collect(Collectors.toList());
     }
 
     public List<Supporter> getCMLSupporters()
@@ -81,7 +82,7 @@ public class Supporters
 
     public List<Supporter> getCMLDevelopers()
     {
-        return this.supporters.stream().filter(s -> s.name.equals("Discord") || s.name.equals("ElGatoPro300") || s.name.equals("SIRSYP")) .sorted(Comparator.comparing((a) -> a.date)).collect(Collectors.toList());
+        return this.supporters.stream().filter(s -> s.name.equals("Discord") || s.name.equals("ElGatoPro300") || s.name.equals("El_Redstoniano") || s.name.equals("SIRSYP")) .sorted(Comparator.comparing((a) -> a.date)).collect(Collectors.toList());
     }
 
     public List<Supporter> getSpecialThanksSupporters()

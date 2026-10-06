@@ -112,18 +112,21 @@ public class OrbitFilmCameraController implements ICameraController
         return -1;
     }
 
-    public void start(UIContext context)
+    /**
+     * @return {@code true} if a drag was armed (callers should consume the click only then)
+     */
+    public boolean start(UIContext context)
     {
-        if (!this.canInteract())
+        if (!this.canInteract() || !this.canStartMouseOrbit(context))
         {
-            return;
+            return false;
         }
 
         int button = this.canStart(context);
 
         if (button < 0)
         {
-            return;
+            return false;
         }
 
         this.center = button == 2 && Window.isKeyPressed(Keys.FLIGHT_ORBIT.getMainKey());
@@ -145,6 +148,8 @@ public class OrbitFilmCameraController implements ICameraController
             this.distance = this.position.distance(p);
             this.offsetY = p.y;
         }
+
+        return true;
     }
 
     public void stop()
@@ -167,12 +172,23 @@ public class OrbitFilmCameraController implements ICameraController
             return false;
         }
 
+        boolean releasing = context.getKeyAction() == KeyAction.RELEASED;
+        boolean releaseCleanup = releasing
+            && (!this.velocityPosition.equals(0, 0, 0) || !this.velocityAngle.equals(0, 0, 0, 0));
+
         /* Flight keys (WASD/Space/arrows) follow canInteract(): either flight mode,
          * or orbit-without-flight when that setting is enabled. With the setting off
          * (default), Space stays free for play/pause while orbit POV is selected. */
-        if (this.canInteract() || area.isInside(context) || (!this.velocityPosition.equals(0, 0, 0) && context.getKeyAction() == KeyAction.RELEASED) || (!this.velocityAngle.equals(0, 0, 0, 0) && context.getKeyAction() == KeyAction.RELEASED))
+        if (this.canInteract() || area.isInside(context) || releaseCleanup)
         {
-            if (!this.canInteract() && context.getKeyAction() != KeyAction.RELEASED)
+            if (!this.canInteract() && !releasing)
+            {
+                return false;
+            }
+
+            /* Restrict: keyboard orbit only while the cursor is in the 3D viewport.
+             * Key releases still clear velocity so WASD cannot stick outside. */
+            if (!releasing && !this.canUseOrbitKeys(context))
             {
                 return false;
             }
@@ -298,7 +314,15 @@ public class OrbitFilmCameraController implements ICameraController
 
         if (this.canInteract())
         {
-            if (this.velocityPosition.lengthSquared() > 0 && !this.center)
+            boolean keysOk = this.canUseOrbitKeys(context);
+
+            if (!keysOk)
+            {
+                this.velocityPosition.set(0, 0, 0);
+                this.velocityAngle.set(0, 0, 0, 0);
+            }
+
+            if (keysOk && this.velocityPosition.lengthSquared() > 0 && !this.center)
             {
                 this.position.add(this.rotateVector(-this.velocityPosition.x, this.velocityPosition.y, -this.velocityPosition.z, this.rotation.y, this.rotation.x).mul(this.getSpeed()));
 
@@ -306,11 +330,13 @@ public class OrbitFilmCameraController implements ICameraController
             }
             else if (this.center)
             {
+                /* Keep center-orbit pose in sync even if the cursor left the viewport
+                 * mid-drag (mouse orbit is allowed to continue until release). */
                 this.position.set(this.rotateVector(0F, 0F, 1F, this.rotation.y, this.rotation.x).mul(this.distance));
                 this.position.add(0, this.offsetY, 0);
             }
 
-            if (this.velocityAngle.lengthSquared() > 0)
+            if (keysOk && this.velocityAngle.lengthSquared() > 0)
             {
                 float angleSpeed = this.controller.panel.dashboard.orbit.getAngleSpeed() * this.getSpeed() * 4F;
 
@@ -455,6 +481,41 @@ public class OrbitFilmCameraController implements ICameraController
 
         return BBSSettings.editorOrbitWithoutFlight.get()
             && this.controller.getPovMode() == UIFilmController.CAMERA_MODE_ORBIT;
+    }
+
+    /**
+     * Mouse orbit may start only inside the letterboxed 3D viewport when Restrict is on.
+     * An already-armed drag may continue outside until mouse release ({@link #handleOrbiting}).
+     */
+    private boolean canStartMouseOrbit(UIContext context)
+    {
+        if (!BBSSettings.editorOrbitRestrictToViewport.get())
+        {
+            return true;
+        }
+
+        return this.isInsideOrbitViewport(context);
+    }
+
+    /**
+     * Keyboard orbit (WASD / arrows) follows the same Restrict gate as mouse start.
+     * Subject to change later if free-roam keys outside the viewport are preferred again.
+     */
+    private boolean canUseOrbitKeys(UIContext context)
+    {
+        if (!BBSSettings.editorOrbitRestrictToViewport.get())
+        {
+            return true;
+        }
+
+        return this.isInsideOrbitViewport(context);
+    }
+
+    private boolean isInsideOrbitViewport(UIContext context)
+    {
+        Area viewport = this.controller.panel.preview.getAbsoluteViewport();
+
+        return viewport != null && viewport.isInside(context);
     }
 
     private float getOrbitDistance()

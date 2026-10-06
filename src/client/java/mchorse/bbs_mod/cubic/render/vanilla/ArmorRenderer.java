@@ -114,7 +114,7 @@ public class ArmorRenderer
             Equippable equippable = itemStack.get(DataComponents.EQUIPPABLE);
             HumanoidModel bipedModel = this.getModel(armorSlot);
 
-            if (bipedModel != null)
+            if (bipedModel != null && equippable != null && equippable.slot() == armorSlot && equippable.assetId().isPresent())
             {
                 ModelPart part = this.getPart(bipedModel, type);
                 boolean innerModel = this.usesInnerModel(armorSlot);
