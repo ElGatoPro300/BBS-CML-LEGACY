@@ -66,7 +66,6 @@ public class UISubtitleRenderer
         Supplier<ShaderProgram> supplier = () -> program;
 
         net.minecraft.client.gl.Framebuffer fb = MinecraftClient.getInstance().getFramebuffer();
-        float layoutScale = ScreenOverlayLayout.resolutionScale(frameW, frameH);
 
         /* Text-atlas FBO applyClear() shrinks glViewport; beginWrite(false) alone may not
          * restore it (same class of bug as UIFilmController stencil picking). Save so
@@ -111,11 +110,10 @@ public class UISubtitleRenderer
             String label = StringUtils.processColoredText(subtitle.label);
             float w = 0;
             float h = 0;
-            int x = Math.round(ScreenOverlayLayout.posX(frameW, subtitle.windowX, subtitle.x, layoutScale));
-            int y = Math.round(ScreenOverlayLayout.posY(frameH, subtitle.windowY, subtitle.y, layoutScale));
-            /* Bake at authored size, then place with layout scale so text keeps reference proportions. */
+            /* Same centered 1920×1080 stage as Image — no fit-shrink on H↔V. */
+            int x = Math.round(ScreenOverlayLayout.stagePosX(frameW, subtitle.windowX, subtitle.x));
+            int y = Math.round(ScreenOverlayLayout.stagePosY(frameH, subtitle.windowY, subtitle.y));
             float bakeScale = subtitle.size;
-            float placeScale = layoutScale;
             int subColor = subtitle.color;
             int wrapWidth = Math.max(0, Math.round(subtitle.maxWidth));
 
@@ -130,8 +128,8 @@ public class UISubtitleRenderer
 
             int fw = (int) ((w + 10) * bakeScale);
             int fh = (int) ((h + 10) * bakeScale);
-            int drawW = Math.max(1, Math.round(fw * placeScale));
-            int drawH = Math.max(1, Math.round(fh * placeScale));
+            int drawW = Math.max(1, fw);
+            int drawH = Math.max(1, fh);
 
             if (fw <= 0 || fh <= 0)
             {

@@ -2,7 +2,7 @@ package mchorse.bbs_mod.ui.film.clips;
 
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.clips.misc.ImageClip;
-import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.l10n.keys.IKey;
@@ -440,15 +440,15 @@ public class UIImageClip extends UIClip<ImageClip>
     private double computeHeightForWidth(double widthPercent, Link link)
     {
         int[] dimensions = this.getTextureDimensions(link);
-        int screenW = BBSRendering.getVideoWidth();
-        int screenH = BBSRendering.getVideoHeight();
 
-        if (dimensions == null || dimensions[0] <= 0 || dimensions[1] <= 0 || screenW <= 0 || screenH <= 0)
+        if (dimensions == null)
         {
             return widthPercent;
         }
 
-        return widthPercent * screenW * dimensions[1] / ((double) dimensions[0] * screenH);
+        /* Match UIImageRenderer: % axes are against the fixed 1920×1080 reference.
+         * Using the live export size made portrait textures lock W%==H% on 9:16 exports. */
+        return ScreenOverlayLayout.heightPercentForWidth(widthPercent, dimensions[0], dimensions[1]);
     }
 
     private double computeWidthForHeight(double heightPercent)
@@ -459,15 +459,13 @@ public class UIImageClip extends UIClip<ImageClip>
     private double computeWidthForHeight(double heightPercent, Link link)
     {
         int[] dimensions = this.getTextureDimensions(link);
-        int screenW = BBSRendering.getVideoWidth();
-        int screenH = BBSRendering.getVideoHeight();
 
-        if (dimensions == null || dimensions[0] <= 0 || dimensions[1] <= 0 || screenW <= 0 || screenH <= 0)
+        if (dimensions == null)
         {
             return heightPercent;
         }
 
-        return heightPercent * dimensions[0] * screenH / ((double) dimensions[1] * screenW);
+        return ScreenOverlayLayout.widthPercentForHeight(heightPercent, dimensions[0], dimensions[1]);
     }
 
     private int[] getTextureDimensions()
