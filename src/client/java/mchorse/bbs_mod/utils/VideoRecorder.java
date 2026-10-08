@@ -116,7 +116,7 @@ public class VideoRecorder
 
             movies.mkdirs();
 
-            Path path = Paths.get(movies.toString());
+            Path path = movies.getAbsoluteFile().toPath();
             this.exportFolder = path;
             String params = this.filmAudioFile != null && !this.recordAmbientAudio
                 ? BBSSettings.videoSettings.argumentsAudio.get()
@@ -176,7 +176,7 @@ public class VideoRecorder
                 log = BBSMod.getSettingsPath("video.log");
             }
 
-            builder.directory(path.toFile());
+            builder.directory(path.toAbsolutePath().toFile());
             builder.redirectErrorStream(true);
             builder.redirectOutput(log);
 
@@ -223,6 +223,14 @@ public class VideoRecorder
             LoopbackAudioController.suppressFilmClipPlayback(false);
             this.suppressFilmClipPlaybackForRender = false;
             e.printStackTrace();
+
+            /* Surface encoder failures so UIFilmRecorder can abort F1 playback. */
+            if (e instanceof RuntimeException runtimeException)
+            {
+                throw runtimeException;
+            }
+
+            throw new RuntimeException(e);
         }
 
         this.serverTicks = this.lastServerTicks = 0;
