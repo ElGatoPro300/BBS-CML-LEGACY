@@ -1,12 +1,15 @@
 package mchorse.bbs_mod.client.screen;
 
 /**
- * Shared layout space for film screen overlays (Image, Subtitle, Video, Hotbar, BossBar).
+ * Shared layout space for HUD-style film overlays (Subtitle, Hotbar, BossBar).
  * <p>
- * Clip size percentages and pixel offsets are interpreted against a fixed
+ * Size percentages and pixel offsets are interpreted against a fixed
  * {@link #REFERENCE_WIDTH}×{@link #REFERENCE_HEIGHT} frame, then mapped to the current
- * export/window size with a uniform fit scale. Changing the 3D viewport / export aspect
- * therefore preserves each overlay's authored aspect ratio.
+ * export/window size with a uniform fit scale so HUD chrome keeps its authored aspect.
+ * <p>
+ * Image and Video clips intentionally size against the <em>current</em> frame instead
+ * (see {@code UIImageRenderer} / {@code WaterMediaVideoRenderer}) so 100% fills the
+ * export resolution on both landscape and portrait.
  */
 public final class ScreenOverlayLayout
 {

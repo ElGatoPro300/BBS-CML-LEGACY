@@ -3,7 +3,6 @@ package mchorse.bbs_mod.ui.film;
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.clips.misc.ImageOverlay;
 import mchorse.bbs_mod.client.BBSShaders;
-import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.forms.renderers.utils.FormTextureBlendRenderer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
@@ -41,7 +40,6 @@ public class UIImageRenderer
             return;
         }
 
-        float scale = ScreenOverlayLayout.resolutionScale(frameW, frameH);
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
         /* X/Y rotations move quad corners into Z. The old ±100 near/far clipped
          * those sides as angle increased; size the depth range for screen-scale quads. */
@@ -64,17 +62,18 @@ public class UIImageRenderer
             float widthPercent = overlay.width / 100F;
             float heightPercent = overlay.height / 100F;
             /* Keep sub-pixel size so width/height keyframes interpolate smoothly
-             * instead of stair-stepping on whole pixels (worse over long spans). */
-            float fw = widthPercent == 0F ? 0F : ScreenOverlayLayout.sizeX(widthPercent, scale);
-            float fh = heightPercent == 0F ? 0F : ScreenOverlayLayout.sizeY(heightPercent, scale);
+             * instead of stair-stepping on whole pixels (worse over long spans).
+             * Size % is relative to the current frame (export/preview), not a fixed 16:9 ref. */
+            float fw = widthPercent == 0F ? 0F : frameW * widthPercent;
+            float fh = heightPercent == 0F ? 0F : frameH * heightPercent;
 
             if (fw == 0F || fh == 0F)
             {
                 continue;
             }
 
-            float x = ScreenOverlayLayout.posX(frameW, overlay.windowX, overlay.x, scale);
-            float y = ScreenOverlayLayout.posY(frameH, overlay.windowY, overlay.y, scale);
+            float x = frameW * overlay.windowX + overlay.x;
+            float y = frameH * overlay.windowY + overlay.y;
 
             FormTextureBlendRenderer.draw(overlay.textureBlend, overlay.texture, (link, alphaFactor) ->
             {

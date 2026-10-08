@@ -11,7 +11,6 @@ import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.compat.HdrModCompat;
 import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
 import mchorse.bbs_mod.client.screen.ScreenEffectRenderer;
-import mchorse.bbs_mod.client.video.VideoRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.events.TriggerBlockEntityUpdateCallback;
@@ -876,9 +875,8 @@ public class BBSRendering
             Matrix4f ortho = new Matrix4f().ortho(0, area.w, area.h, 0, -1000, 3000);
 
             RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
+            /* Videos (incl. global) are drawn inside ScreenEffectRenderer by renderOrder. */
             ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-            /* Global videos stay above all screen overlays (floating-reference path in editor). */
-            VideoRenderer.renderClips(batcher.getContext().getMatrices(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
 
             RenderSystem.setProjectionMatrix(cache, VertexSorter.BY_Z);
         }
@@ -894,7 +892,6 @@ public class BBSRendering
 
             RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
             ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-            VideoRenderer.renderClips(batcher.getContext().getMatrices(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
 
             RenderSystem.setProjectionMatrix(cache, VertexSorter.BY_Z);
         }

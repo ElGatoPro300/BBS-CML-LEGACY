@@ -3,7 +3,6 @@ package mchorse.bbs_mod.client.video;
 import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.misc.VideoOverlay;
 import mchorse.bbs_mod.client.BBSRendering;
-import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.utils.Area;
@@ -91,6 +90,10 @@ public class WaterMediaVideoRenderer
             video.loops.get());
     }
 
+    /**
+     * Legacy direct path kept for callers that still pass clip lists. Prefer
+     * {@link #renderOverlay} via {@code ScreenEffectRenderer} so layer order is respected.
+     */
     public static void renderClips(MatrixStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
     {
         for (Clip clip : clips)
@@ -104,21 +107,16 @@ public class WaterMediaVideoRenderer
                     continue;
                 }
 
-                /* Non-global layered video is drawn via ScreenEffectRenderer (renderOrder). */
-                if (!video.global.get())
-                {
-                    continue;
-                }
-
                 Area baseArea = (globalArea != null) ? globalArea : viewport;
 
-                renderVideoInArea(stack, batcher, video, tick, isRunning, baseArea, viewport, context, screenWidth, screenHeight, true);
+                renderVideoInArea(stack, batcher, video, tick, isRunning, baseArea, viewport, context, screenWidth, screenHeight, video.global.get());
             }
         }
     }
 
     /**
-     * Draw a non-global {@link VideoOverlay} registered during clip apply, using film viewport size.
+     * Draw a {@link VideoOverlay} registered during clip apply (respects {@code renderOrder}).
+     * Non-global clips are scissored to the film viewport; global skips scissor.
      */
     public static void renderOverlay(MatrixStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
     {
@@ -130,7 +128,15 @@ public class WaterMediaVideoRenderer
         int[] rect = layoutVideoRect(viewport.x, viewport.y, viewport.w, viewport.h,
             overlay.width, overlay.height, overlay.x, overlay.y, overlay.path);
 
-        batcher.clip(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
+        if (!overlay.global)
+        {
+            batcher.clip(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
+        }
+        else
+        {
+            batcher.flush();
+        }
+
         render(stack,
             overlay.path,
             overlay.videoTick,
@@ -139,7 +145,11 @@ public class WaterMediaVideoRenderer
             rect[0], rect[1], rect[2], rect[3], overlay.opacity,
             overlay.cropX, overlay.cropY, overlay.cropWidth, overlay.cropHeight,
             overlay.loops);
-        batcher.unclip(screenWidth, screenHeight);
+
+        if (!overlay.global)
+        {
+            batcher.unclip(screenWidth, screenHeight);
+        }
     }
 
     private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
@@ -191,55 +201,49 @@ public class WaterMediaVideoRenderer
     }
 
     /**
-     * Layout video into {@code area} using the shared 1920×1080 overlay reference.
-     * Both size axes 0 = contain (video aspect) inside the area; otherwise W%/H% and
-     * pixel offsets are reference-space values scaled with {@link ScreenOverlayLayout}.
+     * Layout video into {@code area} relative to the current frame size (pre-ScreenOverlayLayout).
+     * Both size axes 0 = contain (video aspect) inside the area; otherwise W%/H% of the area
+     * and pixel offsets in frame space.
      *
      * @return {@code {vx, vy, vw, vh}}
      */
     private static int[] layoutVideoRect(int areaX, int areaY, int areaW, int areaH,
         float widthPercent100, float heightPercent100, float offsetX, float offsetY, String videoPath)
     {
-        float scale = ScreenOverlayLayout.resolutionScale(areaW, areaH);
-        int vw;
-        int vh;
+        int actualW = getVideoWidth(videoPath);
+        int actualH = getVideoHeight(videoPath);
+        int baseW = areaW;
+        int baseH = areaH;
+
+        if (actualW > 0 && actualH > 0)
+        {
+            float videoAspect = (float) actualW / actualH;
+            float areaAspect = (float) areaW / areaH;
+
+            if (videoAspect > areaAspect)
+            {
+                baseH = Math.round(areaW / videoAspect);
+            }
+            else
+            {
+                baseW = Math.round(areaH * videoAspect);
+            }
+        }
+
+        float widthPercent = widthPercent100 / 100F;
+        float heightPercent = heightPercent100 / 100F;
 
         if (widthPercent100 == 0F && heightPercent100 == 0F)
         {
-            int actualW = getVideoWidth(videoPath);
-            int actualH = getVideoHeight(videoPath);
-            int baseW = areaW;
-            int baseH = areaH;
-
-            if (actualW > 0 && actualH > 0)
-            {
-                float videoAspect = (float) actualW / actualH;
-                float areaAspect = (float) areaW / areaH;
-
-                if (videoAspect > areaAspect)
-                {
-                    baseH = Math.round(areaW / videoAspect);
-                }
-                else
-                {
-                    baseW = Math.round(areaH * videoAspect);
-                }
-            }
-
-            vw = baseW;
-            vh = baseH;
-        }
-        else
-        {
-            float widthPercent = widthPercent100 / 100F;
-            float heightPercent = heightPercent100 / 100F;
-
-            vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(ScreenOverlayLayout.sizeX(Math.abs(widthPercent), scale))) * (widthPercent < 0F ? -1 : 1);
-            vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(ScreenOverlayLayout.sizeY(Math.abs(heightPercent), scale))) * (heightPercent < 0F ? -1 : 1);
+            widthPercent = 1F;
+            heightPercent = 1F;
         }
 
-        int vx = areaX + (areaW - vw) / 2 + Math.round(offsetX * scale);
-        int vy = areaY + (areaH - vh) / 2 + Math.round(offsetY * scale);
+        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
+        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
+
+        int vx = areaX + (areaW - vw) / 2 + Math.round(offsetX);
+        int vy = areaY + (areaH - vh) / 2 + Math.round(offsetY);
 
         return new int[] {vx, vy, vw, vh};
     }
