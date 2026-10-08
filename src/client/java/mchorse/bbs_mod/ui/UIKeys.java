@@ -2363,6 +2363,7 @@ public class UIKeys
     public static final IKey WELCOME_FFMPEG_FOUND = L10n.lang("bbs.welcome.ffmpeg.found");
     public static final IKey WELCOME_FFMPEG_NOT_FOUND = L10n.lang("bbs.welcome.ffmpeg.not_found");
     public static final IKey WELCOME_FFMPEG_PICK = L10n.lang("bbs.welcome.ffmpeg.pick");
+    public static final IKey WELCOME_FFMPEG_NO_PATH = L10n.lang("bbs.welcome.ffmpeg.no_path");
     public static final IKey WELCOME_TUTORIALS = L10n.lang("bbs.welcome.tutorials");
     public static final IKey WELCOME_COMMUNITY_TITLE = L10n.lang("bbs.welcome.community.title");
     public static final IKey WELCOME_COMMUNITY_SUBTITLE = L10n.lang("bbs.welcome.community.subtitle");
@@ -2402,8 +2403,11 @@ public class UIKeys
     public static final IKey WELCOME_PANEL_CAMERA_TIMELINE = L10n.lang("bbs.welcome.panel.camera_timeline");
     public static final IKey WELCOME_PANEL_VISOR = L10n.lang("bbs.welcome.panel.visor");
     public static final IKey WELCOME_PANEL_VISOR_VERTICAL = L10n.lang("bbs.welcome.panel.visor_vertical");
+    public static final IKey WELCOME_PANEL_VISOR_PANORAMIC = L10n.lang("bbs.welcome.panel.visor_panoramic");
+    public static final IKey WELCOME_PANEL_VISOR_3D = L10n.lang("bbs.welcome.panel.visor_3d");
     public static final IKey WELCOME_PANEL_REPLAYS = L10n.lang("bbs.welcome.panel.replays");
     public static final IKey WELCOME_PANEL_GENERAL = L10n.lang("bbs.welcome.panel.general");
+    public static final IKey WELCOME_PANEL_IDLE_CLIP = L10n.lang("bbs.welcome.panel.idle_clip");
 
     public static final IKey CONFIG_CHROMA_SKY_BILLBOARD = L10n.lang("bbs.config.chroma_sky.billboard");
     public static final IKey CONFIG_CHROMA_SKY_CLOUDS = L10n.lang("bbs.config.chroma_sky.clouds");
