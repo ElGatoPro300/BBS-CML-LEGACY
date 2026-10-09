@@ -16,6 +16,8 @@ import org.joml.Matrix4f;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import org.lwjgl.opengl.GL11;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -117,6 +119,11 @@ public class WaterMediaVideoRenderer
     /**
      * Draw a {@link VideoOverlay} registered during clip apply (respects {@code renderOrder}).
      * Non-global clips are scissored to the film viewport; global skips scissor.
+     * <p>
+     * Must not use {@link Batcher2D#clip} / DrawContext scissor here: that path treats
+     * coordinates as GUI space and flips Y with the <em>window</em> framebuffer height.
+     * After the film world pass, {@code renderingWorld} is false so WindowMixin no longer
+     * spoofs size — on a portrait export FBO that wrongly crops the top of the video.
      */
     public static void renderOverlay(MatrixStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
     {
@@ -128,13 +135,11 @@ public class WaterMediaVideoRenderer
         int[] rect = layoutVideoRect(viewport.x, viewport.y, viewport.w, viewport.h,
             overlay.width, overlay.height, overlay.x, overlay.y, overlay.path);
 
+        batcher.flush();
+
         if (!overlay.global)
         {
-            batcher.clip(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
-        }
-        else
-        {
-            batcher.flush();
+            enableFilmPixelScissor(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
         }
 
         render(stack,
@@ -148,8 +153,33 @@ public class WaterMediaVideoRenderer
 
         if (!overlay.global)
         {
-            batcher.unclip(screenWidth, screenHeight);
+            RenderSystem.disableScissor();
         }
+    }
+
+    /**
+     * Scissor in film/export pixel space mapped through the current GL viewport
+     * (correct for custom-size portrait/landscape FBOs).
+     */
+    private static void enableFilmPixelScissor(int x, int y, int w, int h, int frameW, int frameH)
+    {
+        if (frameW <= 0 || frameH <= 0 || w <= 0 || h <= 0)
+        {
+            return;
+        }
+
+        int[] vp = new int[4];
+
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, vp);
+
+        float sx = vp[2] / (float) frameW;
+        float sy = vp[3] / (float) frameH;
+        int glX = vp[0] + Math.round(x * sx);
+        int glY = vp[1] + Math.round((frameH - y - h) * sy);
+        int glW = Math.max(0, Math.round(w * sx));
+        int glH = Math.max(0, Math.round(h * sy));
+
+        RenderSystem.enableScissor(glX, glY, glW, glH);
     }
 
     private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
