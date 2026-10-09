@@ -40,13 +40,17 @@ public class UIImageRenderer
             return;
         }
 
-        /* Size/position as % of the current film frame (same contract as 2.1.2:
-         * percentages of the overlay ortho space, which is the export/video size). */
+        /* 2.1.2 used framebuffer texture size / 2 as the image ortho space. Size %
+         * still fills the viewport (half-space maps to full NDC); pixel x/y offsets
+         * stay in that half-space so films from 2.1.2 keep the same place. Do not
+         * share Hotbar's export-pixel offsets — those are a different unit. */
+        int width = frameW / 2;
+        int height = frameH / 2;
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
         /* X/Y rotations move quad corners into Z. The old ±100 near/far clipped
          * those sides as angle increased; size the depth range for screen-scale quads. */
-        float zExtent = Math.max(1000F, Math.max(frameW, frameH) * 8F);
-        Matrix4f ortho = new Matrix4f().ortho(0, frameW, frameH, 0, -zExtent, zExtent);
+        float zExtent = Math.max(1000F, Math.max(width, height) * 8F);
+        Matrix4f ortho = new Matrix4f().ortho(0, width, height, 0, -zExtent, zExtent);
 
         RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
@@ -65,16 +69,16 @@ public class UIImageRenderer
             float heightPercent = overlay.height / 100F;
             /* Keep sub-pixel size so width/height keyframes interpolate smoothly
              * instead of stair-stepping on whole pixels (worse over long spans). */
-            float fw = widthPercent == 0F ? 0F : frameW * widthPercent;
-            float fh = heightPercent == 0F ? 0F : frameH * heightPercent;
+            float fw = widthPercent == 0F ? 0F : width * widthPercent;
+            float fh = heightPercent == 0F ? 0F : height * heightPercent;
 
             if (fw == 0F || fh == 0F)
             {
                 continue;
             }
 
-            float x = frameW * overlay.windowX + overlay.x;
-            float y = frameH * overlay.windowY + overlay.y;
+            float x = width * overlay.windowX + overlay.x;
+            float y = height * overlay.windowY + overlay.y;
 
             FormTextureBlendRenderer.draw(overlay.textureBlend, overlay.texture, (link, alphaFactor) ->
             {

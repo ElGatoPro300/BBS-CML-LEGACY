@@ -75,9 +75,15 @@ public class UISubtitleRenderer
 
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
 
+        /* Pre-4fd65c0 used framebuffer texture size / 2 as the subtitle ortho space.
+         * Size is absolute GUI/font pixels (unlike Image %), so that half-space must
+         * stay — full video ortho made the same bake appear ~half as large. */
+        int width = frameW / 2;
+        int height = frameH / 2;
+
         Framebuffer framebuffer = getTextFramebuffer();
         Texture texture = framebuffer.getMainTexture();
-        Matrix4f ortho = new Matrix4f().ortho(0, frameW, frameH, 0, -100, 100);
+        Matrix4f ortho = new Matrix4f().ortho(0, width, height, 0, -100, 100);
         FontRenderer font = Batcher2D.getVanillaTextRenderer();
         TextRenderer vanilla = MinecraftClient.getInstance().textRenderer;
 
@@ -109,10 +115,9 @@ public class UISubtitleRenderer
             String label = StringUtils.processColoredText(subtitle.label);
             float w = 0;
             float h = 0;
-            /* Frame-relative place (2.1.2): window% of film frame + pixel offset. */
-            int x = (int) (frameW * subtitle.windowX + subtitle.x);
-            int y = (int) (frameH * subtitle.windowY + subtitle.y);
-            float bakeScale = subtitle.size;
+            int x = (int) (width * subtitle.windowX + subtitle.x);
+            int y = (int) (height * subtitle.windowY + subtitle.y);
+            float scale = subtitle.size;
             int subColor = subtitle.color;
             int wrapWidth = Math.max(0, Math.round(subtitle.maxWidth));
 
@@ -125,17 +130,15 @@ public class UISubtitleRenderer
 
             h = (strings.size() - 1) * subtitle.lineHeight + vanilla.fontHeight - 2;
 
-            int fw = (int) ((w + 10) * bakeScale);
-            int fh = (int) ((h + 10) * bakeScale);
-            int drawW = Math.max(1, fw);
-            int drawH = Math.max(1, fh);
+            int fw = (int) ((w + 10) * scale);
+            int fh = (int) ((h + 10) * scale);
 
             if (fw <= 0 || fh <= 0)
             {
                 continue;
             }
 
-            RenderSystem.setProjectionMatrix(new Matrix4f().ortho(0, w + 10, 0, h + 10, -100, 100), VertexSorter.BY_Z); /* bake space */
+            RenderSystem.setProjectionMatrix(new Matrix4f().ortho(0, w + 10, 0, h + 10, -100, 100), VertexSorter.BY_Z);
 
             framebuffer.resize(fw, fh);
             /* Transparent clear — opaque world clear-color would show as a black plate
@@ -210,7 +213,7 @@ public class UISubtitleRenderer
             RenderSystem.enableBlend();
             RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
-            batcher.texturedBox(supplier, texture.id, Colors.setA(Colors.WHITE, alpha), -drawW * subtitle.anchorX, -drawH * subtitle.anchorY, drawW, drawH, 0, 0, texture.width, texture.height, texture.width, texture.height);
+            batcher.texturedBox(supplier, texture.id, Colors.setA(Colors.WHITE, alpha), -fw * subtitle.anchorX, -fh * subtitle.anchorY, texture.width, texture.height, 0, 0, texture.width, texture.height, texture.width, texture.height);
 
             stack.pop();
         }
