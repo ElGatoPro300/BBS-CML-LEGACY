@@ -107,8 +107,9 @@ public class UIHotbarRenderer
             return;
         }
 
-        /* Export ortho is in framebuffer pixels; vanilla HUD is authored in GUI-scaled
-         * units. Multiply by auto GUI scale for this frame so default scale 1 ≈ in-game. */
+        /* Film ortho is export pixels; hotbar widgets are GUI-space (182×22). Multiply by
+         * auto GUI scale for this frame so default scale 1 ≈ in-game HUD size. BossBar keeps
+         * its own 2.1.2 resolutionScale and must not use this boost. */
         float scale = Math.max(0.05F, hotbar.scale) * ScreenOverlayLayout.hudGuiScale(width, height);
         int hotbarWidth = 182;
         int x = originX + Math.round(width / 2F + hotbar.x - hotbarWidth / 2F);

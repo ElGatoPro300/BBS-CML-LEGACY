@@ -4,7 +4,6 @@ import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.clips.misc.Subtitle;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.screen.ColorGradeRenderer;
-import mchorse.bbs_mod.client.screen.ScreenOverlayLayout;
 import mchorse.bbs_mod.graphics.Framebuffer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.resources.Link;
@@ -110,9 +109,9 @@ public class UISubtitleRenderer
             String label = StringUtils.processColoredText(subtitle.label);
             float w = 0;
             float h = 0;
-            /* Same centered 1920×1080 stage as Image — no fit-shrink on H↔V. */
-            int x = Math.round(ScreenOverlayLayout.stagePosX(frameW, subtitle.windowX, subtitle.x));
-            int y = Math.round(ScreenOverlayLayout.stagePosY(frameH, subtitle.windowY, subtitle.y));
+            /* Frame-relative place (2.1.2): window% of film frame + pixel offset. */
+            int x = (int) (frameW * subtitle.windowX + subtitle.x);
+            int y = (int) (frameH * subtitle.windowY + subtitle.y);
             float bakeScale = subtitle.size;
             int subColor = subtitle.color;
             int wrapWidth = Math.max(0, Math.round(subtitle.maxWidth));
