@@ -12,7 +12,6 @@ import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.compat.HdrModCompat;
 import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
 import mchorse.bbs_mod.client.screen.ScreenEffectRenderer;
-import mchorse.bbs_mod.client.video.VideoRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.events.TriggerBlockEntityUpdateCallback;
@@ -250,16 +249,22 @@ public class BBSRendering
     public static File getVideoFolder()
     {
         File movies = new File(BBSMod.getSettingsFolder().getParentFile(), "movies");
-        File exportPath = new File(BBSSettings.videoSettings.path.get());
+        String configured = BBSSettings.videoSettings.path.get();
 
-        if (exportPath.isDirectory())
+        /* Java 25 treats new File("").isDirectory() as true (cwd). Skip blank paths. */
+        if (configured != null && !configured.trim().isEmpty())
         {
-            movies = exportPath;
+            File exportPath = new File(configured.trim());
+
+            if (exportPath.isDirectory())
+            {
+                movies = exportPath;
+            }
         }
 
         movies.mkdirs();
 
-        return movies;
+        return movies.getAbsoluteFile();
     }
 
     public static boolean canReplaceFramebuffer()
@@ -945,8 +950,6 @@ public class BBSRendering
                     Batcher2D batcher = new Batcher2D(drawContext);
 
                     ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-                    /* Global videos stay above all screen overlays (floating-reference path in editor). */
-                    VideoRenderer.renderClips(new MatrixStack(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
                     flushGuiRenderState();
                 });
             }
@@ -968,7 +971,6 @@ public class BBSRendering
                     Batcher2D batcher = new Batcher2D(drawContext);
 
                     ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-                    VideoRenderer.renderClips(new MatrixStack(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
                     flushGuiRenderState();
                 });
             }

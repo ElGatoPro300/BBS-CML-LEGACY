@@ -30,7 +30,15 @@ public class FFMpegUtils
      */
     private static File findFFMPEG(String path)
     {
-        File file = new File(path);
+        String trimmed = path == null ? "" : path.trim();
+
+        /* Java 25: File("").isDirectory() is true; never treat blank as a folder. */
+        if (trimmed.isEmpty())
+        {
+            return new File("ffmpeg");
+        }
+
+        File file = new File(trimmed);
         boolean isWin = OS.CURRENT == OS.WINDOWS;
 
         if (file.isDirectory())
@@ -52,7 +60,7 @@ public class FFMpegUtils
         }
         else if (isWin && !file.exists())
         {
-            File exe = new File(path + ".exe");
+            File exe = new File(trimmed + ".exe");
 
             if (exe.exists())
             {
