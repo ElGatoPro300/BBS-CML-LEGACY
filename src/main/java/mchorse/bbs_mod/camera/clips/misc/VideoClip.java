@@ -89,13 +89,8 @@ public class VideoClip extends CameraClip
     @Override
     protected void applyClip(ClipContext context, Position position)
     {
-        /* Global videos keep the floating panel / post-pass path; only layered film video
-         * participates in ScreenEffectRenderer order with images/subtitles/effects. */
-        if (this.global.get())
-        {
-            return;
-        }
-
+        /* Both global and non-global videos participate in ScreenEffectRenderer order.
+         * Global only skips viewport scissor so the quad can float outside the film area. */
         String path = this.video.get();
 
         if (path == null || path.isEmpty())
@@ -128,6 +123,7 @@ public class VideoClip extends CameraClip
             this.cropHeight.get(),
             alpha,
             this.loops.get(),
+            this.global.get(),
             context.applied
         );
         getVideos(context).add(this.overlay);
