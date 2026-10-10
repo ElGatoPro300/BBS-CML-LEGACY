@@ -7,7 +7,6 @@ import mchorse.bbs_mod.film.replays.ReplayKeyframes;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.utils.clips.Clip;
-
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
@@ -28,47 +27,24 @@ public abstract class ActionClip extends Clip
 
     public final void applyClient(IEntity entity, Film film, Replay replay, int tick)
     {
-        this.applyClientCrossing(entity, film, replay, tick - 1F, tick);
-    }
-
-    /**
-     * Fire client actions whose start (and frequency hits) cross {@code (prevTime, currTime]}.
-     */
-    public final void applyClientCrossing(IEntity entity, Film film, Replay replay, float prevTime, float currTime)
-    {
-        if (!this.enabled.get() || currTime <= prevTime)
+        if (!this.enabled.get())
         {
             return;
         }
 
+        int relaive = tick - this.tick.get();
         int frequency = this.frequency.get();
-        float start = this.tick.get();
 
-        if (frequency <= 0)
+        if (frequency == 0)
         {
-            if (prevTime < start && currTime >= start)
+            if (relaive == 0)
             {
-                this.applyClientAction(entity, film, replay, Math.round(start));
+                this.applyClientAction(entity, film, replay, tick);
             }
-
-            return;
         }
-
-        float first = start;
-
-        if (first <= prevTime)
+        else if (relaive % frequency == 0)
         {
-            float steps = (float) Math.floor((prevTime - start) / frequency) + 1F;
-
-            first = start + steps * frequency;
-        }
-
-        for (float t = first; t <= currTime + 1e-4F; t += frequency)
-        {
-            if (t > prevTime)
-            {
-                this.applyClientAction(entity, film, replay, Math.round(t));
-            }
+            this.applyClientAction(entity, film, replay, tick);
         }
     }
 
@@ -77,47 +53,24 @@ public abstract class ActionClip extends Clip
 
     public final void apply(LivingEntity actor, SuperFakePlayer player, Film film, Replay replay, int tick)
     {
-        this.applyCrossing(actor, player, film, replay, tick - 1F, tick);
-    }
-
-    /**
-     * Fire server actions whose start (and frequency hits) cross {@code (prevTime, currTime]}.
-     */
-    public final void applyCrossing(LivingEntity actor, SuperFakePlayer player, Film film, Replay replay, float prevTime, float currTime)
-    {
-        if (!this.enabled.get() || currTime <= prevTime)
+        if (!this.enabled.get())
         {
             return;
         }
 
+        int relaive = tick - this.tick.get();
         int frequency = this.frequency.get();
-        float start = this.tick.get();
 
-        if (frequency <= 0)
+        if (frequency == 0)
         {
-            if (prevTime < start && currTime >= start)
+            if (relaive == 0)
             {
-                this.applyAction(actor, player, film, replay, Math.round(start));
+                this.applyAction(actor, player, film, replay, tick);
             }
-
-            return;
         }
-
-        float first = start;
-
-        if (first <= prevTime)
+        else if (relaive % frequency == 0)
         {
-            float steps = (float) Math.floor((prevTime - start) / frequency) + 1F;
-
-            first = start + steps * frequency;
-        }
-
-        for (float t = first; t <= currTime + 1e-4F; t += frequency)
-        {
-            if (t > prevTime)
-            {
-                this.applyAction(actor, player, film, replay, Math.round(t));
-            }
+            this.applyAction(actor, player, film, replay, tick);
         }
     }
 

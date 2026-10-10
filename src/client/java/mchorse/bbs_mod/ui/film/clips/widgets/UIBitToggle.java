@@ -46,8 +46,7 @@ public class UIBitToggle extends UIElement
         this.bits.add(new Bit(UIKeys.CAMERA_PANELS_YAW, Colors.YELLOW));
         this.bits.add(new Bit(UIKeys.CAMERA_PANELS_PITCH, Colors.CYAN));
         this.bits.add(new Bit(UIKeys.CAMERA_PANELS_ROLL, Colors.MAGENTA));
-        /* Match keyframe clip FOV track color (COLORS[6] = LIGHTEST_GRAY). */
-        this.bits.add(new Bit(UIKeys.CAMERA_PANELS_FOV, Colors.LIGHTEST_GRAY));
+        this.bits.add(new Bit(UIKeys.CAMERA_PANELS_FOV, Colors.A50));
 
         return this;
     }
@@ -147,7 +146,7 @@ public class UIBitToggle extends UIElement
                 context.batcher.box(x, this.area.y, right, this.area.y + this.area.h, Colors.mulRGB(bit.color, 0.2F));
             }
 
-            if (!isSelected && i < size - 1)
+            if (!isSelected && i != 6)
             {
                 context.batcher.box(right - 1, this.area.y, right, this.area.y + this.area.h, Colors.A50);
             }

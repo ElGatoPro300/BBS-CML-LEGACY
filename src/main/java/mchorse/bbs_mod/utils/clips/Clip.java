@@ -1,27 +1,17 @@
 package mchorse.bbs_mod.utils.clips;
 
-import mchorse.bbs_mod.settings.values.core.ValueGroup;
-import mchorse.bbs_mod.settings.values.core.ValueString;
 import mchorse.bbs_mod.settings.values.numeric.ValueBoolean;
-import mchorse.bbs_mod.settings.values.numeric.ValueFloat;
+import mchorse.bbs_mod.settings.values.core.ValueGroup;
 import mchorse.bbs_mod.settings.values.numeric.ValueInt;
+import mchorse.bbs_mod.settings.values.core.ValueString;
 
 public abstract class Clip extends ValueGroup
 {
-    /**
-     * Soft upper bound for clip duration (ticks). Extremely large values
-     * (e.g. 9999999999 in film data) overflow int on load and freeze the
-     * camera timeline ruler when it iterates the full span.
-     * 1_000_000 ticks ≈ 13.9 h at 20 TPS — enough for long static holds.
-     */
-    public static final int MAX_DURATION_TICKS = 1_000_000;
-
     public final ValueBoolean enabled = new ValueBoolean("enabled", true);
     public final ValueString title = new ValueString("title", "");
     public final ValueInt layer = new ValueInt("layer", 0, 0, Integer.MAX_VALUE);
-    /** Film time in ticks (float). Sub-tick values (e.g. 1.5) are valid for action/command clips. */
-    public final ValueFloat tick = new ValueFloat("tick", 0F, 0F, Float.MAX_VALUE);
-    public final ValueInt duration = new ValueInt("duration", 1, 1, MAX_DURATION_TICKS);
+    public final ValueInt tick = new ValueInt("tick", 0, 0, Integer.MAX_VALUE);
+    public final ValueInt duration = new ValueInt("duration", 1, 1, Integer.MAX_VALUE);
     public final Envelope envelope = new Envelope("envelope");
 
     public Clip()
@@ -43,31 +33,15 @@ public abstract class Clip extends ValueGroup
 
     public boolean isInside(int tick)
     {
-        return this.isInside((float) tick);
-    }
+        int offset = this.tick.get();
 
-    public boolean isInside(float tick)
-    {
-        float offset = this.tick.get();
-
-        return tick >= offset && (double) tick < (double) offset + this.duration.get();
-    }
-
-    /** Rounded film tick for APIs that still use integer timeline units. */
-    public int getTickInt()
-    {
-        return Math.round(this.tick.get());
+        return tick >= offset && tick < offset + this.duration.get();
     }
 
     public void shift(double dx, double dy, double dz)
     {}
 
     public void shiftLeft(int tick)
-    {
-        this.shiftLeft(tick, false);
-    }
-
-    public void shiftLeft(int tick, boolean direct)
     {}
 
     public Clip copy()

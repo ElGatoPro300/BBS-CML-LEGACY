@@ -4,11 +4,8 @@ import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.camera.clips.CameraClip;
 import mchorse.bbs_mod.camera.clips.ClipFactoryData;
 import mchorse.bbs_mod.camera.clips.converters.IClipConverter;
-import mchorse.bbs_mod.camera.clips.misc.AudioClip;
-import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.overwrite.KeyframeClip;
 import mchorse.bbs_mod.camera.utils.TimeUtils;
-import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
@@ -18,44 +15,24 @@ import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.resources.Link;
-import mchorse.bbs_mod.settings.values.IValueListener;
-import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
-import mchorse.bbs_mod.ui.film.audio.UIAudioRecorder;
-import mchorse.bbs_mod.ui.film.clips.UIClip;
 import mchorse.bbs_mod.ui.film.clips.renderer.IUIClipRenderer;
 import mchorse.bbs_mod.ui.film.clips.renderer.UIClipRenderers;
-import mchorse.bbs_mod.ui.film.toolbar.ClipPlacementInteractionState;
-import mchorse.bbs_mod.ui.film.toolbar.LoopMarkerInteractionState;
-import mchorse.bbs_mod.ui.film.toolbar.TimelineClipTypeGroups;
-import mchorse.bbs_mod.ui.film.toolbar.TimelineToolbarPointerBlock;
-import mchorse.bbs_mod.ui.film.toolbar.UIClipPlacementInteraction;
-import mchorse.bbs_mod.ui.film.toolbar.UILoopMarkerInteraction;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
-import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIIcon;
-import mchorse.bbs_mod.ui.framework.elements.context.UIContextMenu;
-import mchorse.bbs_mod.ui.framework.elements.context.UISimpleContextMenu;
-import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.ui.utils.Scale;
 import mchorse.bbs_mod.ui.utils.Scroll;
 import mchorse.bbs_mod.ui.utils.ScrollDirection;
-import mchorse.bbs_mod.ui.utils.TimelineRuler;
-import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.UIUtils;
-import mchorse.bbs_mod.ui.utils.context.ColorfulContextAction;
-import mchorse.bbs_mod.ui.utils.context.ContextAction;
 import mchorse.bbs_mod.ui.utils.context.ContextMenuManager;
-import mchorse.bbs_mod.ui.utils.icons.Icon;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.ui.utils.presets.UICopyPasteController;
 import mchorse.bbs_mod.ui.utils.presets.UIPresetContextMenu;
-import mchorse.bbs_mod.utils.Direction;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.clips.Clips;
@@ -63,9 +40,7 @@ import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.factory.IFactory;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.presets.PresetManager;
-
 import org.joml.Vector3i;
-
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -75,7 +50,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -87,12 +61,8 @@ public class UIClips extends UIElement
 
     private static final int MARGIN = 10;
     private static final int LAYER_HEIGHT = 20;
-    private static final int RULER_HEIGHT = 16;
-    /** Minimum clickable width so sub-tick clips stay selectable when zoomed out. */
-    private static final int MIN_CLIP_HIT_WIDTH = 8;
 
     private static final Area CLIP_AREA = new Area();
-    private static final Area CLIP_HIT_AREA = new Area();
 
     /* Main objects */
     private IUIClipsDelegate delegate;
@@ -124,23 +94,9 @@ public class UIClips extends UIElement
 
     /* Embedded view */
     private UIIcon embeddedClose;
-    private UIIcon embeddedLayout;
     private UIElement embedded;
-    private boolean embeddedStackedLayout;
-
-    /**
-     * Optional listener notified whenever {@link #embedView(UIElement)} runs.
-     * Receives the new embedded element (may be {@code null}). Added for the
-     * timeline toolbar system so it can swap its section hierarchy when a
-     * keyframe editor is opened inside a clip timeline. Purely additive: when
-     * unset, this class behaves exactly as before.
-     */
-    private Consumer<UIElement> embedViewListener;
 
     private Vector3i addPreview;
-    private Vector3i placementPreview;
-    private final UIClipPlacementInteraction clipPlacement = new UIClipPlacementInteraction();
-    private final UILoopMarkerInteraction loopMarkerInteraction = new UILoopMarkerInteraction();
     private int layers;
 
     private UIClipRenderers renderers = new UIClipRenderers();
@@ -149,10 +105,6 @@ public class UIClips extends UIElement
     private List<Clip> otherClips = Collections.emptyList();
     private Set<Integer> snappingPoints = new HashSet<>();
     private List<Vector3i> grabbedData = new ArrayList<>();
-    private List<Integer> grabbedOffsets = new ArrayList<>();
-    /** Grab-start tick/layer/duration for {@link #otherClips} (ripple resize). */
-    private List<Vector3i> otherClipData = new ArrayList<>();
-    private List<Integer> otherOffsets = new ArrayList<>();
 
     private UICopyPasteController copyPasteController;
 
@@ -190,51 +142,11 @@ public class UIClips extends UIElement
         this.delegate = delegate;
         this.factory = factory;
 
-        this.embeddedClose = new UIIcon(Icons.CLOSE, (b) -> this.delegate.embedView(null))
-        {
-            @Override
-            protected void renderSkin(UIContext context)
-            {
-                if (UIClips.this.embedded != null)
-                {
-                    this.area.render(context.batcher, Colors.setA(Colors.RED, 0.5F));
-                }
-
-                super.renderSkin(context);
-            }
-        };
-        this.embeddedClose.relative(this).xy(4, 4);
-
-        this.embeddedLayout = new UIIcon(Icons.EXCHANGE, (b) ->
-        {
-            if (this.embedded instanceof UIKeyframeEditor keyframeEditor)
-            {
-                this.embeddedStackedLayout = !this.embeddedStackedLayout;
-                keyframeEditor.setStackedLayout(this.embeddedStackedLayout);
-                b.active(this.embeddedStackedLayout);
-            }
-        })
-        {
-            @Override
-            protected void renderSkin(UIContext context)
-            {
-                int primary = BBSSettings.primaryColor.get();
-                /* Match Open Camera Editor highlight colors, but with vertical top->bottom gradient. */
-                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.y + 2, Colors.A100 | primary);
-                context.batcher.gradientVBox(this.area.x, this.area.y + 2, this.area.ex(), this.area.ey(), Colors.A75 | primary, primary);
-
-                super.renderSkin(context);
-            }
-        };
-        this.embeddedLayout.relative(this).xy(26, 4);
+        this.embeddedClose = new UIIcon(Icons.CLOSE, (b) -> this.embedView(null));
+        this.embeddedClose.relative(this);
 
         this.context((menu) ->
         {
-            if (this.clipPlacement.isActive() || this.loopMarkerInteraction.isActive())
-            {
-                return;
-            }
-
             UIContext context = this.getContext();
             int mouseX = context.mouseX;
             int mouseY = context.mouseY;
@@ -258,7 +170,6 @@ public class UIClips extends UIElement
                 menu.action(Icons.SHIFT_TO, UIKeys.CAMERA_TIMELINE_CONTEXT_SHIFT_DURATION, this::shiftDurationToCursor);
             }
 
-            menu.action(Icons.MAXIMIZE, UIKeys.CAMERA_TIMELINE_CONTEXT_MAXIMIZE, this::resetView);
             menu.action(Icons.EXCHANGE, UIKeys.CAMERA_TIMELINE_CONTEXT_REORGANIZE, () -> this.clips.sortLayers());
 
             if (hasSelected)
@@ -267,45 +178,24 @@ public class UIClips extends UIElement
             }
         });
 
-        Supplier<Boolean> canUseKeybinds = () -> this.canUseToolbarKeybinds();
+        Supplier<Boolean> canUseKeybinds = () -> this.delegate.canUseKeybinds() && !this.hasEmbeddedView();
         Supplier<Boolean> canUseKeybindsSelected = () -> this.delegate.getClip() != null && canUseKeybinds.get();
 
-        this.keys().register(Keys.KEYFRAMES_MAXIMIZE, this::resetView).inside().category(KEYS_CATEGORY);
-        this.keys().register(Keys.DESELECT, () -> this.pickClip(null)).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
-        this.keys().register(Keys.ADD_ON_TOP, this::showAddsOnTop).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
-        this.keys().register(Keys.ADD_AT_CURSOR, this::showAddsAtCursor).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.ADD_AT_TICK, this::showAddsAtTick).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.KEYFRAMES_MAXIMIZE, this::resetView).category(KEYS_CATEGORY);
+        this.keys().register(Keys.DESELECT, () -> this.pickClip(null)).category(KEYS_CATEGORY).active(canUseKeybindsSelected);
+        this.keys().register(Keys.ADD_ON_TOP, this::showAddsOnTop).category(KEYS_CATEGORY).active(canUseKeybindsSelected);
+        this.keys().register(Keys.ADD_AT_CURSOR, this::showAddsAtCursor).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.ADD_AT_TICK, this::showAddsAtTick).category(KEYS_CATEGORY).active(canUseKeybinds);
         this.keys().register(Keys.COPY, () ->
         {
-            if (this.copyPasteController.copy())
-            {
-                UIUtils.playClick();
-            }
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
-        this.keys().register(Keys.CUT, () ->
-        {
-            if (this.delegate.getClip() == null)
-            {
-                this.getContext().notifyError(UIKeys.GENERAL_CUT_EMPTY);
-                return;
-            }
-
-            if (this.copyPasteController.copy())
-            {
-                this.removeSelected();
-                UIUtils.playClick();
-                this.getContext().notifyInfo(UIKeys.GENERAL_CUT);
-            }
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
+            if (this.copyPasteController.copy()) UIUtils.playClick();
+        }).category(KEYS_CATEGORY).active(canUseKeybindsSelected);
         this.keys().register(Keys.PASTE, () ->
         {
             UIContext context = this.getContext();
 
-            if (this.copyPasteController.paste(context.mouseX, context.mouseY))
-            {
-                UIUtils.playClick();
-            }
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
+            if (this.copyPasteController.paste(context.mouseX, context.mouseY)) UIUtils.playClick();
+        }).category(KEYS_CATEGORY).active(canUseKeybinds);
         this.keys().register(Keys.PRESETS, () ->
         {
             UIContext context = this.getContext();
@@ -315,40 +205,35 @@ public class UIClips extends UIElement
                 this.copyPasteController.openPresets(context, context.mouseX, context.mouseY);
                 UIUtils.playClick();
             }
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_CUT, this::cut).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_SHIFT, this::shiftToCursor).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_DURATION, this::shiftDurationToCursor).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.DELETE, this::removeSelected).inside().label(UIKeys.CAMERA_TIMELINE_CONTEXT_REMOVE_CLIPS).category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_ENABLE, this::toggleEnabled).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_SELECT_AFTER, this::selectAfter).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
-        this.keys().register(Keys.CLIP_SELECT_BEFORE, this::selectBefore).inside().category(KEYS_CATEGORY).active(canUseKeybinds);
+        }).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_CUT, this::cut).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_SHIFT, this::shiftToCursor).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_DURATION, this::shiftDurationToCursor).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.DELETE, this::removeSelected).label(UIKeys.CAMERA_TIMELINE_CONTEXT_REMOVE_CLIPS).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_ENABLE, this::toggleEnabled).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_SELECT_AFTER, this::selectAfter).category(KEYS_CATEGORY).active(canUseKeybinds);
+        this.keys().register(Keys.CLIP_SELECT_BEFORE, this::selectBefore).category(KEYS_CATEGORY).active(canUseKeybinds);
         this.keys().register(Keys.FADE_IN, () ->
         {
             Clip clip = this.delegate.getClip();
-            int tick = Math.max(0, this.delegate.getCursor() - Math.round(clip.tick.get()));
+            int tick = Math.max(0, this.delegate.getCursor() - clip.tick.get());
 
             clip.envelope.fadeIn.set((float) tick);
             this.delegate.fillData();
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
+        }).category(KEYS_CATEGORY).active(canUseKeybindsSelected);
         this.keys().register(Keys.FADE_OUT, () ->
         {
             Clip clip = this.delegate.getClip();
-            int tick = Math.max(0, Math.round(clip.tick.get()) + clip.duration.get() - this.delegate.getCursor());
+            int tick = Math.max(0, clip.tick.get() + clip.duration.get() - this.delegate.getCursor());
 
             clip.envelope.fadeOut.set((float) tick);
             this.delegate.fillData();
-        }).inside().category(KEYS_CATEGORY).active(canUseKeybindsSelected);
+        }).category(KEYS_CATEGORY).active(canUseKeybindsSelected);
     }
 
     public UIClipRenderers getRenderers()
     {
         return this.renderers;
-    }
-
-    public Film getFilm()
-    {
-        return this.delegate.getFilm();
     }
 
     public IFactory<Clip, ClipFactoryData> getFactory()
@@ -381,17 +266,21 @@ public class UIClips extends UIElement
 
     private void showAddsAtCursor()
     {
-        this.enterAddClipPlacement(-1, UIKeys.TIMELINE_INTERACTION_PICK_ADD_AT_CURSOR);
+        UIContext context = this.getContext();
+
+        this.showAddsAtCursor(context, context.mouseX, context.mouseY);
     }
 
     private void showAddsAtCursor(UIContext context, int mouseX, int mouseY)
     {
-        this.showAddClips(context, this.checkSize(this.fromGraphXFloat(mouseX), this.fromLayerY(mouseY), BBSSettings.getDefaultDuration()));
+        this.showAddClips(context, this.checkSize(this.fromGraphX(mouseX), this.fromLayerY(mouseY), BBSSettings.getDefaultDuration()));
     }
 
     private void showAddsAtTick()
     {
-        this.enterAddClipPlacement(this.delegate.getCursor(), UIKeys.TIMELINE_INTERACTION_PICK_ADD_AT_TICK);
+        UIContext context = this.getContext();
+
+        this.showAddsAtTick(context, context.mouseX, context.mouseY);
     }
 
     private void showAddsAtTick(UIContext context, int mouseX, int mouseY)
@@ -399,106 +288,50 @@ public class UIClips extends UIElement
         this.showAddClips(context, this.checkSize(this.delegate.getCursor(), this.fromLayerY(mouseY), BBSSettings.getDefaultDuration()));
     }
 
-    private void enterAddClipPlacement(int lockedTick, IKey hint)
-    {
-        this.enterClipPlacement(hint, BBSSettings.getDefaultDuration(), lockedTick, -1,
-            (tick, layer, duration) -> this.showAddClips(this.getContext(), new Vector3i(tick, layer, duration)));
-    }
-
     private void showAddsOnTop()
     {
         Clip clip = this.delegate.getClip();
         UIContext context = this.getContext();
 
-        if (clip == null)
-        {
-            return;
-        }
-
         this.showAddClips(context, this.checkSize(clip.tick.get(), clip.layer.get() + 1, clip.duration.get()));
     }
 
-    private static int toMilliTick(float tick)
+    private Vector3i checkSize(int tick, int layer, int duration)
     {
-        return Math.round(tick * 1000F);
-    }
-
-    private static float fromMilliTick(int milli)
-    {
-        return milli / 1000F;
-    }
-
-    public static float quantizeFilmTick(float tick)
-    {
-        int fps = Math.max(1, BBSRendering.getVideoFrameRate());
-        float step = 20F / fps;
-
-        return Math.round(tick / step) * step;
-    }
-
-    private Vector3i checkSize(float tick, int layer, int duration)
-    {
-        float start = tick;
-        int remaining = duration;
-
-        while (remaining > 0)
+        for (Clip clip : this.clips.get())
         {
-            boolean advanced = false;
-
-            for (Clip clip : this.clips.get())
+            if (clip.layer.get() == layer)
             {
-                if (clip.layer.get() != layer)
+                int l1 = clip.tick.get();
+                int r1 = l1 + clip.duration.get();
+                int l2 = tick;
+                int r2 = l2 + duration;
+
+                if (MathUtils.isInside(l1, r1, l2, r2))
                 {
-                    continue;
-                }
-
-                float clipStart = clip.tick.get();
-                float clipEnd = clipStart + clip.duration.get();
-                float end = start + remaining;
-
-                if (end <= clipStart || start >= clipEnd)
-                {
-                    continue;
-                }
-
-                if (start >= clipStart && start < clipEnd)
-                {
-                    int overflow = Math.round(end - clipEnd);
-
-                    if (overflow <= 0)
+                    if (l1 < r2 && r2 <= r1)
                     {
-                        return null;
+                        int diff = r2 - l1;
+
+                        duration -= diff;
                     }
-
-                    /* Place only the portion that extends past the obstacle's end. */
-                    start = clipEnd;
-                    remaining = overflow;
-                    advanced = true;
-                    break;
-                }
-
-                if (start < clipStart && end > clipStart)
-                {
-                    remaining = Math.round(clipStart - start);
-
-                    if (remaining <= 0)
+                    else if (l2 < r1 && r1 <= r2)
                     {
-                        return null;
-                    }
+                        int diff = r1 - l2;
 
-                    return new Vector3i(toMilliTick(start), layer, remaining);
+                        tick = r1;
+                        duration -= diff;
+                    }
                 }
             }
-
-            if (advanced)
-            {
-                continue;
-            }
-
-            return new Vector3i(toMilliTick(start), layer, remaining);
         }
 
-        return null;
+        if (duration <= 0)
+        {
+            return null;
+        }
+
+        return new Vector3i(tick, layer, duration);
     }
 
     private void showAddClips(UIContext context, Vector3i preview)
@@ -514,14 +347,23 @@ public class UIClips extends UIElement
 
         context.replaceContextMenu((add) ->
         {
-            add.custom(new UIClipsAddContextMenu(this, preview));
+            add.autoKeys(UIKeys.CAMERA_TIMELINE_KEYS_CLIPS);
+
+            for (Link type : this.factory.getKeys())
+            {
+                IKey typeKey = UIKeys.CAMERA_TIMELINE_CONTEXT_ADD_CLIP_TYPE.format(UIKeys.C_CLIP.get(type));
+                ClipFactoryData data = this.factory.getData(type);
+
+                add.action(data.icon, typeKey, data.color, () -> this.addClip(type, preview.x, preview.y, preview.z));
+            }
+
             add.onClose((m) -> this.addPreview = null);
         });
 
         this.addPreview = preview;
     }
 
-    private void addClip(Link type, float tick, int layer, int duration)
+    private void addClip(Link type, int tick, int layer, int duration)
     {
         Clip clip = this.factory.create(type);
 
@@ -536,7 +378,7 @@ public class UIClips extends UIElement
     /**
      * Add a new clip of given type at mouse coordinates.
      */
-    private void addClip(Clip clip, float tick, int layer, int duration)
+    private void addClip(Clip clip, int tick, int layer, int duration)
     {
         clip.layer.set(layer);
         clip.tick.set(tick);
@@ -563,19 +405,19 @@ public class UIClips extends UIElement
 
     private void pasteClips(MapType data, int mouseX, int mouseY)
     {
-        this.pasteClips(data, this.fromGraphXFloat(mouseX));
+        this.pasteClips(data, this.fromGraphX(mouseX));
     }
 
     /**
      * Paste given clip data to timeline.
      */
-    private void pasteClips(MapType data, float tick)
+    private void pasteClips(MapType data, int tick)
     {
         this.clearSelection();
 
         ListType clipsList = data.getList("clips");
         List<Clip> newClips = new ArrayList<>();
-        float min = Float.POSITIVE_INFINITY;
+        int min = Integer.MAX_VALUE;
 
         try
         {
@@ -584,7 +426,7 @@ public class UIClips extends UIElement
                 MapType typeMap = type.asMap();
                 Clip clip = this.factory.fromData(typeMap);
 
-                min = Math.min(min, Math.round(clip.tick.get()));
+                min = Math.min(min, clip.tick.get());
 
                 newClips.add(clip);
             }
@@ -625,7 +467,7 @@ public class UIClips extends UIElement
                 continue;
             }
 
-            Clip copy = clip.breakDown(offset - Math.round(clip.tick.get()));
+            Clip copy = clip.breakDown(offset - clip.tick.get());
 
             if (copy != null)
             {
@@ -733,10 +575,36 @@ public class UIClips extends UIElement
 
                 menu.action(Icons.EDITOR, IKey.constant(form == null ? "-" : form.getFormIdOrName()), () ->
                 {
-                    KeyframeClip clip = this.createKeyframeClipFromReplay(replay);
-                    int size = this.computeReplayClipDuration(replay);
+                    KeyframeClip clip = new KeyframeClip();
 
-                    this.addClip(clip, this.fromGraphXFloat(mouseX), this.fromLayerY(mouseY), size);
+                    clip.fov.insert(0, 50D);
+
+                    clip.x.copyKeyframes(replay.keyframes.x);
+                    clip.y.copyKeyframes(replay.keyframes.y);
+                    clip.z.copyKeyframes(replay.keyframes.z);
+
+                    clip.yaw.copyKeyframes(replay.keyframes.yaw);
+                    clip.pitch.copyKeyframes(replay.keyframes.pitch);
+
+                    for (Keyframe<Double> keyframe : clip.yaw.getKeyframes())
+                    {
+                        keyframe.setValue(180D + keyframe.getValue());
+                        // keyframe.setLy(180F + keyframe.getLy());
+                        // keyframe.setRy(180F + keyframe.getRy());
+                    }
+
+                    double size = Math.max(
+                        clip.x.getLength(),
+                        Math.max(
+                            clip.y.getLength(),
+                            Math.max(
+                                clip.z.getLength(),
+                                Math.max(clip.yaw.getLength(), clip.pitch.getLength())
+                            )
+                        )
+                    );
+
+                    this.addClip(clip, this.fromGraphX(mouseX), this.fromLayerY(mouseY), (int) size);
                 });
             }
         });
@@ -758,7 +626,7 @@ public class UIClips extends UIElement
 
         for (Clip clip : clips)
         {
-            min = Math.min(min, Math.round(clip.tick.get()));
+            min = Math.min(min, clip.tick.get());
         }
 
         int diff = this.delegate.getCursor() - min;
@@ -785,7 +653,7 @@ public class UIClips extends UIElement
 
         for (Clip clip : clips)
         {
-            int offset = Math.round(clip.tick.get());
+            int offset = clip.tick.get();
 
             if (this.delegate.getCursor() > offset)
             {
@@ -948,11 +816,6 @@ public class UIClips extends UIElement
 
     public void addSelected(Clip clip)
     {
-        if (clip == null || this.clips == null)
-        {
-            return;
-        }
-
         int index = this.clips.getIndex(clip);
 
         if (index >= 0)
@@ -995,12 +858,6 @@ public class UIClips extends UIElement
         {
             int duration = clips.calculateDuration();
 
-            /* Guard against absurd spans from corrupted tick/duration data. */
-            if (duration > Clip.MAX_DURATION_TICKS * 10)
-            {
-                duration = Clip.MAX_DURATION_TICKS * 10;
-            }
-
             if (duration > 0)
             {
                 this.scale.view(0, duration);
@@ -1016,7 +873,7 @@ public class UIClips extends UIElement
     {
         int bottom = this.area.ey() - MARGIN;
 
-        if (mouseY < this.area.y + RULER_HEIGHT || mouseY > bottom)
+        if (mouseY > bottom)
         {
             return -1;
         }
@@ -1024,22 +881,6 @@ public class UIClips extends UIElement
         mouseY -= this.getScroll();
 
         return (bottom - mouseY) / LAYER_HEIGHT;
-    }
-
-    /**
-     * Layer lanes for clip placement / hit-tests: full timeline width between
-     * the ruler and bottom margin (not only the vertical scrollbar strip).
-     */
-    public boolean isClipLayerAreaInside(UIContext context)
-    {
-        if (context == null)
-        {
-            return false;
-        }
-
-        return context.mouseX >= this.area.x && context.mouseX < this.area.ex()
-            && context.mouseY >= this.area.y + RULER_HEIGHT
-            && context.mouseY < this.area.ey() - MARGIN;
     }
 
     public int toLayerY(int layer)
@@ -1069,91 +910,24 @@ public class UIClips extends UIElement
         }
     }
 
-    /** Highest layer that currently has a clip, or {@code -1} when the timeline is empty. */
-    public int getHighestOccupiedLayer()
-    {
-        if (this.clips == null)
-        {
-            return -1;
-        }
-
-        int max = -1;
-
-        for (Clip clip : this.clips.get())
-        {
-            max = Math.max(max, clip.layer.get());
-        }
-
-        return max;
-    }
-
     public int fromGraphX(int mouseX)
     {
-        return Math.round(this.fromGraphXFloat(mouseX));
+        return (int) Math.round(this.scale.from(mouseX));
     }
 
-    public float fromGraphXFloat(int mouseX)
+    public int toGraphX(int value)
     {
-        float raw = Math.max(0F, (float) this.scale.from(mouseX));
-
-        /* Shift = millimeter (0.001 tick) placement/drag; otherwise snap to video-frame grid. */
-        if (Window.isShiftPressed())
-        {
-            return Math.round(raw * 1000F) / 1000F;
-        }
-
-        return quantizeFilmTick(raw);
-    }
-
-    public int toGraphX(double value)
-    {
-        return (int) this.scale.to(value);
+        return (int) (this.scale.to(value));
     }
 
     public void setLoopMin()
     {
-        this.setLoopMinAt(this.delegate.getCursor());
+        this.loopMin = this.delegate.getCursor();
     }
 
     public void setLoopMax()
     {
-        this.setLoopMaxAt(this.delegate.getCursor());
-    }
-
-    public void setLoopMinAt(int tick)
-    {
-        this.loopMin = tick;
-        this.verifyLoopMinMax();
-    }
-
-    public void setLoopMaxAt(int tick)
-    {
-        this.loopMax = tick;
-        this.verifyLoopMinMax();
-    }
-
-    public void toolbarEnterLoopMin()
-    {
-        if (!this.canUseToolbarKeybinds())
-        {
-            return;
-        }
-
-        this.cancelToolbarInteraction();
-        this.loopMarkerInteraction.enter(new LoopMarkerInteractionState(true,
-            UIKeys.TIMELINE_INTERACTION_LOOP_SET_MIN));
-    }
-
-    public void toolbarEnterLoopMax()
-    {
-        if (!this.canUseToolbarKeybinds())
-        {
-            return;
-        }
-
-        this.cancelToolbarInteraction();
-        this.loopMarkerInteraction.enter(new LoopMarkerInteractionState(false,
-            UIKeys.TIMELINE_INTERACTION_LOOP_SET_MAX));
+        this.loopMax = this.delegate.getCursor();
     }
 
     private void verifyLoopMinMax()
@@ -1172,391 +946,12 @@ public class UIClips extends UIElement
         return this.embedded != null;
     }
 
-    /**
-     * Whether clip-timeline keybinds (and toolbar clip actions) are allowed.
-     * Disabled while a keyframe editor is embedded on top of the timeline.
-     */
-    public boolean canUseToolbarKeybinds()
-    {
-        return this.delegate.canUseKeybinds() && !this.hasEmbeddedView();
-    }
-
-    public Clip getDelegateClip()
-    {
-        return this.delegate.getClip();
-    }
-
-    /**
-     * Toolbar action: clear the current clip selection.
-     */
-    public void toolbarDeselectAll()
-    {
-        this.pickClip(null);
-    }
-
-    /**
-     * Toolbar action: reset horizontal view scale to fit all clips in the timeline.
-     */
-    public void toolbarResetView()
-    {
-        this.resetView();
-    }
-
-    /**
-     * Toolbar action: toggle the enabled flag on all selected clips.
-     */
-    public void toolbarToggleEnabled()
-    {
-        this.toggleEnabled();
-    }
-
-    public void toolbarCopy()
-    {
-        if (this.copyPasteController.copy())
-        {
-            UIUtils.playClick();
-        }
-    }
-
-    public void toolbarCut()
-    {
-        if (this.delegate.getClip() == null)
-        {
-            this.getContext().notifyError(UIKeys.GENERAL_CUT_EMPTY);
-
-            return;
-        }
-
-        if (this.copyPasteController.copy())
-        {
-            this.removeSelected();
-            UIUtils.playClick();
-            this.getContext().notifyInfo(UIKeys.GENERAL_CUT);
-        }
-    }
-
-    public void toolbarRemoveSelected()
-    {
-        this.removeSelected();
-    }
-
-    public void toolbarCutClipAtCursor()
-    {
-        this.cut();
-    }
-
-    public void toolbarShiftToCursor()
-    {
-        this.shiftToCursor();
-    }
-
-    public void toolbarShiftDurationToCursor()
-    {
-        this.shiftDurationToCursor();
-    }
-
-    public void toolbarFadeIn()
-    {
-        Clip clip = this.delegate.getClip();
-        int tick = Math.max(0, this.delegate.getCursor() - Math.round(clip.tick.get()));
-
-        clip.envelope.fadeIn.set((float) tick);
-        this.delegate.fillData();
-    }
-
-    public void toolbarFadeOut()
-    {
-        Clip clip = this.delegate.getClip();
-        int tick = Math.max(0, Math.round(clip.tick.get()) + clip.duration.get() - this.delegate.getCursor());
-
-        clip.envelope.fadeOut.set((float) tick);
-        this.delegate.fillData();
-    }
-
-    public void toolbarSelectBefore()
-    {
-        this.selectBefore();
-    }
-
-    public void toolbarSelectAfter()
-    {
-        this.selectAfter();
-    }
-
-    public void toolbarPaste()
-    {
-        UIContext context = this.getContext();
-        int pasteX = this.toGraphX(this.delegate.getCursor());
-        int pasteY = this.area.my() + this.area.h / 2;
-
-        if (this.copyPasteController.paste(pasteX, pasteY))
-        {
-            UIUtils.playClick();
-        }
-    }
-
-    public void toolbarOpenPresets()
-    {
-        UIContext context = this.getContext();
-        int anchorX = this.toGraphX(this.delegate.getCursor());
-        int anchorY = this.area.my() + this.area.h / 2;
-
-        if (this.copyPasteController.canPreviewPresets())
-        {
-            this.copyPasteController.openPresets(context, anchorX, anchorY);
-            UIUtils.playClick();
-        }
-    }
-
-    public void toolbarReorganize()
-    {
-        this.clips.sortLayers();
-    }
-
-    public void toolbarConvertTo(Link type)
-    {
-        this.convertTo(type);
-    }
-
-    public void toolbarShowAddsAtCursor()
-    {
-        this.showAddsAtCursor();
-    }
-
-    public void toolbarShowAddsAtTick()
-    {
-        this.showAddsAtTick();
-    }
-
-    public void toolbarShowAddsOnTop()
-    {
-        this.showAddsOnTop();
-    }
-
-    public void toolbarAddClipType(Link type)
-    {
-        this.enterClipPlacement(UIKeys.TIMELINE_INTERACTION_PLACE_CLIP, BBSSettings.getDefaultDuration(), -1, -1,
-            (tick, layer, duration) -> this.addClip(type, fromMilliTick(tick), layer, duration));
-    }
-
-    public void toolbarImportReplay(Replay replay)
-    {
-        int duration = this.computeReplayClipDuration(replay);
-
-        this.enterClipPlacement(UIKeys.TIMELINE_INTERACTION_PLACE_REPLAY, duration, -1, -1,
-            (tick, layer, ignored) ->
-            {
-                KeyframeClip clip = this.createKeyframeClipFromReplay(replay);
-
-                this.addClip(clip, tick, layer, duration);
-            });
-    }
-
-    public void toolbarRecordMicrophone()
-    {
-        UIFilmPanel filmPanel = this.getFilmPanel();
-
-        if (filmPanel == null)
-        {
-            return;
-        }
-
-        UIAudioRecorder.promptThenPlace(filmPanel, this);
-    }
-
-    public void enterClipPlacement(IKey hint, int duration, int lockedTick, int lockedLayer,
-        ClipPlacementInteractionState.IClipPlacementConfirm onConfirm)
-    {
-        this.loopMarkerInteraction.cancel();
-        this.clipPlacement.enter(new ClipPlacementInteractionState(hint, duration, lockedTick, lockedLayer, onConfirm));
-    }
-
-    public void cancelClipPlacement()
-    {
-        this.clipPlacement.cancel(this);
-    }
-
-    public void cancelToolbarInteraction()
-    {
-        this.clipPlacement.cancel(this);
-        this.loopMarkerInteraction.cancel();
-    }
-
-    public boolean isClipPlacementActive()
-    {
-        return this.clipPlacement.isActive();
-    }
-
-    /**
-     * Confirm an active clip-placement at the current mouse position (e.g. after
-     * dragging a clip type from the Minecut Media bin onto the timeline).
-     */
-    public boolean confirmClipPlacementAt(UIContext context)
-    {
-        if (!this.clipPlacement.isActive() || context == null)
-        {
-            return false;
-        }
-
-        this.clipPlacement.updatePreview(this, context);
-
-        if (!this.isClipLayerAreaInside(context))
-        {
-            this.cancelClipPlacement();
-
-            return false;
-        }
-
-        if (this.getPlacementPreview() == null)
-        {
-            /* Still over the timeline but no free slot — keep placement armed for another try. */
-            return false;
-        }
-
-        int prevButton = context.mouseButton;
-
-        context.mouseButton = 0;
-        boolean handled = this.clipPlacement.handleMouseClicked(this, context);
-        context.mouseButton = prevButton;
-
-        return handled && !this.clipPlacement.isActive();
-    }
-
-    public boolean isLoopMarkerInteractionActive()
-    {
-        return this.loopMarkerInteraction.isActive();
-    }
-
-    @Override
-    public UIContextMenu createContextMenu(UIContext context)
-    {
-        if (this.clipPlacement.isActive() || this.loopMarkerInteraction.isActive())
-        {
-            return null;
-        }
-
-        return super.createContextMenu(context);
-    }
-
-    public Area getVerticalArea()
-    {
-        return this.vertical.area;
-    }
-
-    public Vector3i computePlacementSize(float tick, int layer, int duration)
-    {
-        return this.checkSize(tick, layer, duration);
-    }
-
-    public void setPlacementPreview(Vector3i preview)
-    {
-        this.placementPreview = preview;
-    }
-
-    public Vector3i getPlacementPreview()
-    {
-        return this.placementPreview;
-    }
-
-    public void clearPlacementPreview()
-    {
-        this.placementPreview = null;
-    }
-
-    private UIFilmPanel getFilmPanel()
-    {
-        if (this.delegate instanceof UIClipsPanel panel)
-        {
-            return panel.filmPanel;
-        }
-
-        return null;
-    }
-
-    private KeyframeClip createKeyframeClipFromReplay(Replay replay)
-    {
-        KeyframeClip clip = new KeyframeClip();
-
-        clip.fov.insert(0, 50D);
-
-        clip.x.copyKeyframes(replay.keyframes.x);
-        clip.y.copyKeyframes(replay.keyframes.y);
-        clip.z.copyKeyframes(replay.keyframes.z);
-
-        clip.yaw.copyKeyframes(replay.keyframes.yaw);
-        clip.pitch.copyKeyframes(replay.keyframes.pitch);
-
-        for (Keyframe<Double> keyframe : clip.yaw.getKeyframes())
-        {
-            keyframe.setValue(180D + keyframe.getValue());
-        }
-
-        return clip;
-    }
-
-    private int computeReplayClipDuration(Replay replay)
-    {
-        KeyframeClip clip = this.createKeyframeClipFromReplay(replay);
-
-        return (int) Math.max(
-            clip.x.getLength(),
-            Math.max(
-                clip.y.getLength(),
-                Math.max(
-                    clip.z.getLength(),
-                    Math.max(clip.yaw.getLength(), clip.pitch.getLength())
-                )
-            )
-        );
-    }
-
-    public UIElement getEmbeddedView()
-    {
-        return this.embedded;
-    }
-
-    public boolean isEmbeddedStackedLayout()
-    {
-        return this.embeddedStackedLayout;
-    }
-
-    public void setEmbeddedStackedLayout(boolean stacked)
-    {
-        this.embeddedStackedLayout = stacked;
-
-        if (this.embedded instanceof UIKeyframeEditor keyframeEditor)
-        {
-            keyframeEditor.setStackedLayout(this.embeddedStackedLayout);
-            this.embeddedLayout.active(this.embeddedStackedLayout);
-        }
-    }
-
-    public void setEmbedViewListener(Consumer<UIElement> listener)
-    {
-        this.embedViewListener = listener;
-    }
-
     public void embedView(UIElement element)
     {
-        /* Selecting clips / setClips always call embedView(null). Re-notifying when
-         * already closed made UIClipsPanel re-focus Camera Properties and rebuild the
-         * whole film layout — that letterboxed the workspace (black strip on the right). */
-        if (this.embedded == element)
-        {
-            return;
-        }
-
         this.embeddedClose.removeFromParent();
-        this.embeddedLayout.removeFromParent();
 
         if (this.embedded != null)
         {
-            if (this.embedded instanceof UIKeyframeEditor keyframeEditor)
-            {
-                keyframeEditor.pickListener(null);
-                keyframeEditor.target(null);
-            }
-
             this.embedded.removeFromParent();
         }
 
@@ -1568,88 +963,8 @@ public class UIClips extends UIElement
 
             this.prepend(this.embedded);
             this.add(this.embeddedClose);
-
-            if (this.embedded instanceof UIKeyframeEditor keyframeEditor)
-            {
-                this.configureEmbeddedKeyframeEditor(keyframeEditor);
-            }
-
             this.embedded.resize();
             this.embeddedClose.resize();
-        }
-        else
-        {
-            this.syncEmbeddedClipPanelVisibility(true);
-        }
-
-        if (this.embedViewListener != null)
-        {
-            this.embedViewListener.accept(this.embedded);
-        }
-    }
-
-    /**
-     * Re-apply side-panel vs properties-tab mode for an open embedded keyframe editor
-     * (settings toggle or workspace layout change).
-     */
-    public void applyEmbeddedKeyframePropertiesMode()
-    {
-        if (this.embedded instanceof UIKeyframeEditor keyframeEditor)
-        {
-            this.embeddedLayout.removeFromParent();
-            /* Retarget only — do not steal the active tab (avoids nested
-             * setupEditorFlex while switching Properties tabs). */
-            this.configureEmbeddedKeyframeEditor(keyframeEditor);
-            this.embedded.resize();
-            this.embeddedClose.resize();
-        }
-    }
-
-    private void configureEmbeddedKeyframeEditor(UIKeyframeEditor keyframeEditor)
-    {
-        UIFilmPanel filmPanel = this.getFilmPanel();
-        boolean sidePanel = BBSSettings.isEmbeddedKeyframeSidePanelEnabled() || filmPanel == null;
-
-        if (sidePanel)
-        {
-            keyframeEditor.pickListener(null);
-            keyframeEditor.target(null);
-            keyframeEditor.overlayPanel(true);
-            keyframeEditor.setStackedLayout(this.embeddedStackedLayout);
-            this.embeddedLayout.active(this.embeddedStackedLayout);
-            this.add(this.embeddedLayout);
-            this.embeddedLayout.resize();
-            this.syncEmbeddedClipPanelVisibility(true);
-        }
-        else
-        {
-            /* Same host as replay keyframes: the general Properties tab (editArea),
-             * not Camera/Action properties — those keep the clip form. */
-            UIElement propertiesTarget = filmPanel.shouldRedirectProperties()
-                ? filmPanel.unifiedEditArea
-                : filmPanel.editArea;
-
-            keyframeEditor.overlayPanel(false);
-            keyframeEditor.target(propertiesTarget);
-            /* Pick a keyframe → show Properties tab. Opening the embed alone does not
-             * focus that tab (keeps Camera/Action Properties if already selected). */
-            keyframeEditor.pickListener(filmPanel::focusEmbeddedKeyframePropertiesTab);
-            this.syncEmbeddedClipPanelVisibility(true);
-        }
-    }
-
-    private void syncEmbeddedClipPanelVisibility(boolean visible)
-    {
-        if (!(this.delegate instanceof UIClipsPanel panel))
-        {
-            return;
-        }
-
-        UIClip clipPanel = panel.getClipPanel();
-
-        if (clipPanel != null)
-        {
-            clipPanel.setVisible(visible && panel.isVisible());
         }
     }
 
@@ -1661,8 +976,7 @@ public class UIClips extends UIElement
         super.afterResizeApplied();
 
         this.vertical.area.copy(this.area);
-        this.vertical.area.y += RULER_HEIGHT;
-        this.vertical.area.h -= RULER_HEIGHT + MARGIN;
+        this.vertical.area.h -= MARGIN;
     }
 
     public void updateScrollSize()
@@ -1682,46 +996,12 @@ public class UIClips extends UIElement
     @Override
     protected boolean subMouseClicked(UIContext context)
     {
-        if (this.loopMarkerInteraction.isActive())
-        {
-            if (this.vertical.mouseClicked(context))
-            {
-                return true;
-            }
-
-            if (this.loopMarkerInteraction.handleMouseClicked(this, context))
-            {
-                return true;
-            }
-        }
-        else if (this.loopMarkerInteraction.handleMouseClicked(this, context))
+        if (this.vertical.mouseClicked(context))
         {
             return true;
         }
 
-        if (this.clipPlacement.isActive())
-        {
-            if (this.vertical.mouseClicked(context))
-            {
-                return true;
-            }
-
-            if (this.clipPlacement.handleMouseClicked(this, context))
-            {
-                return true;
-            }
-        }
-        else if (this.clipPlacement.handleMouseClicked(this, context))
-        {
-            return true;
-        }
-
-        if (!this.clipPlacement.isActive() && !this.loopMarkerInteraction.isActive() && this.vertical.mouseClicked(context))
-        {
-            return true;
-        }
-
-        if (this.area.isInside(context) && !this.hasEmbeddedView() && !TimelineToolbarPointerBlock.blocksPointer(context))
+        if (this.area.isInside(context) && !this.hasEmbeddedView())
         {
             int mouseX = context.mouseX;
             int mouseY = context.mouseY;
@@ -1750,8 +1030,10 @@ public class UIClips extends UIElement
     {
         if (!this.hasEmbeddedView())
         {
+            int tick = (int) Math.floor(this.scale.from(mouseX));
+            int layerIndex = this.fromLayerY(mouseY);
             Clip original = this.delegate.getClip();
-            Clip clip = this.findClipAt(mouseX, mouseY);
+            Clip clip = this.clips.getClipAt(tick, layerIndex);
 
             if (clip != null)
             {
@@ -1781,16 +1063,13 @@ public class UIClips extends UIElement
                 this.grabbedClips = this.getClipsFromSelection();
                 this.otherClips = new ArrayList<>(this.clips.get());
                 this.otherClips.removeIf(this.grabbedClips::contains);
-                this.otherClipData.clear();
-                this.otherOffsets.clear();
-                this.grabbedData.clear();
-                this.grabbedOffsets.clear();
                 this.snappingPoints.clear();
-                this.snappingPoints.add(toMilliTick(this.delegate.getCursor()));
+                this.snappingPoints.add(this.delegate.getCursor());
 
                 if (BBSSettings.editorSnapToMarkers.get())
                 {
-                    int mult = TimelineRuler.steps(this.scale).minor;
+                    /* TODO: generalize this code. Check also other places getMult() */
+                    int mult = this.scale.getMult() * 2;
                     int start = (int) this.scale.getMinValue();
                     int end = (int) this.scale.getMaxValue();
                     int max = Integer.MAX_VALUE;
@@ -1800,11 +1079,10 @@ public class UIClips extends UIElement
 
                     start = MathUtils.clamp(start, 0, max);
                     end = MathUtils.clamp(end, mult, max);
-                    end = this.capRulerEnd(start, end, mult);
 
                     for (int j = start; j <= end; j += mult)
                     {
-                        this.snappingPoints.add(toMilliTick(j));
+                        this.snappingPoints.add(j);
                     }
                 }
                 else
@@ -1814,18 +1092,15 @@ public class UIClips extends UIElement
 
                 for (Clip otherClip : this.otherClips)
                 {
-                    this.otherClipData.add(new Vector3i(toMilliTick(otherClip.tick.get()), otherClip.layer.get(), otherClip.duration.get()));
-                    this.otherOffsets.add(this.getClipOffset(otherClip));
-                    this.snappingPoints.add(toMilliTick(otherClip.tick.get()));
-                    this.snappingPoints.add(toMilliTick(otherClip.tick.get() + otherClip.duration.get()));
+                    this.snappingPoints.add(otherClip.tick.get());
+                    this.snappingPoints.add(otherClip.tick.get() + otherClip.duration.get());
                 }
 
                 this.setMouse(mouseX, mouseY);
 
                 for (Clip selectedClip : this.getClipsFromSelection())
                 {
-                    this.grabbedData.add(new Vector3i(toMilliTick(selectedClip.tick.get()), selectedClip.layer.get(), selectedClip.duration.get()));
-                    this.grabbedOffsets.add(this.getClipOffset(selectedClip));
+                    this.grabbedData.add(new Vector3i(selectedClip.tick.get(), selectedClip.layer.get(), selectedClip.duration.get()));
                 }
 
                 return true;
@@ -1901,8 +1176,7 @@ public class UIClips extends UIElement
     @Override
     public boolean subMouseScrolled(UIContext context)
     {
-        if (this.area.isInside(context) && !this.scrolling && !this.hasEmbeddedView()
-            && !TimelineToolbarPointerBlock.blocksPointer(context))
+        if (this.area.isInside(context) && !this.scrolling && !this.hasEmbeddedView())
         {
             if (context.mouseWheelHorizontal != 0D)
             {
@@ -1932,14 +1206,6 @@ public class UIClips extends UIElement
         }
 
         this.vertical.mouseReleased(context);
-        this.resetStates();
-
-        return super.subMouseReleased(context);
-    }
-
-    private void resetStates()
-    {
-        this.submitGrabbedUndo();
 
         if (this.selecting)
         {
@@ -1947,7 +1213,6 @@ public class UIClips extends UIElement
         }
 
         this.grabMode = 0;
-        this.canGrab = false;
         this.grabbing = false;
         this.selecting = false;
         this.scrubbing = false;
@@ -1958,29 +1223,16 @@ public class UIClips extends UIElement
         this.otherClips = Collections.emptyList();
         this.snappingPoints.clear();
         this.grabbedData.clear();
-        this.grabbedOffsets.clear();
-        this.otherClipData.clear();
-        this.otherOffsets.clear();
 
-        this.vertical.dragging = false;
+        return super.subMouseReleased(context);
     }
 
     @Override
     protected boolean subKeyPressed(UIContext context)
     {
-        if (this.loopMarkerInteraction.handleKeyPressed(context))
-        {
-            return true;
-        }
-
-        if (this.clipPlacement.handleKeyPressed(this, context))
-        {
-            return true;
-        }
-
         if (this.embedded != null && context.isPressed(GLFW.GLFW_KEY_ESCAPE))
         {
-            this.delegate.embedView(null);
+            this.embedView(null);
             UIUtils.playClick();
 
             return true;
@@ -1996,41 +1248,17 @@ public class UIClips extends UIElement
 
         if (this.clips != null && !this.hasEmbeddedView())
         {
-            if (!TimelineToolbarPointerBlock.blocksPointer(context))
-            {
-                this.vertical.drag(context);
-                this.handleInput(context.mouseX, context.mouseY);
-                this.handleScrolling(context.mouseX, context.mouseY);
-            }
-
+            this.vertical.drag(context);
+            this.handleInput(context.mouseX, context.mouseY);
+            this.handleScrolling(context.mouseX, context.mouseY);
             this.renderCameraWork(context);
         }
-
-        this.loopMarkerInteraction.updatePreview(this, context);
-        this.clipPlacement.updatePreview(this, context);
-        this.loopMarkerInteraction.renderTickPulse(this, context);
-        this.loopMarkerInteraction.renderHint(context, this.area, this);
-        this.clipPlacement.renderHint(context, this.area, this);
 
         super.render(context);
     }
 
     private void handleInput(int mouseX, int mouseY)
     {
-        if ((this.scrubbing || this.selecting || this.grabbing || this.selectingLoop == 0) && !Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_1))
-        {
-            this.resetStates();
-
-            return;
-        }
-
-        if (this.selectingLoop == 1 && !Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_2))
-        {
-            this.resetStates();
-
-            return;
-        }
-
         if (this.scrubbing)
         {
             this.delegate.setCursor(this.fromGraphX(mouseX));
@@ -2068,13 +1296,8 @@ public class UIClips extends UIElement
 
     private void dragClips(int mouseX, int mouseY)
     {
-        if (this.grabbedClips.isEmpty() || this.grabbedData.isEmpty())
-        {
-            return;
-        }
-
         List<Clip> others = Window.isAltPressed() ? Collections.emptyList() : this.otherClips;
-        int dx = toMilliTick(this.fromGraphXFloat(mouseX)) - toMilliTick(this.fromGraphXFloat(this.initialX));
+        int dx = this.fromGraphX(mouseX) - this.fromGraphX(this.initialX);
         int dy = this.fromLayerY(mouseY) - this.fromLayerY(this.initialY);
 
         if (this.grabMode == 0) this.moveClips(others, dx, dy);
@@ -2091,8 +1314,8 @@ public class UIClips extends UIElement
         if (anchor != null)
         {
             Vector3i ref = this.grabbedData.get(anchor.clipIndex());
-            int edgeTick = anchor.isLeft() ? ref.x() : toMilliTick(fromMilliTick(ref.x()) + ref.z());
-            int snapped = this.snapMilli(edgeTick + dx);
+            int edgeTick = ref.x() + (anchor.isLeft() ? 0 : ref.z());
+            int snapped = this.snap(edgeTick + dx);
 
             dx += snapped - (edgeTick + dx);
         }
@@ -2103,7 +1326,7 @@ public class UIClips extends UIElement
         {
             Vector3i v = this.grabbedData.get(i);
 
-            this.setClipData(this.grabbedClips.get(i), fromMilliTick(v.x() + adjusted[0]), v.y() + adjusted[1], v.z());
+            this.setClipData(this.grabbedClips.get(i), v.x() + adjusted[0], v.y() + adjusted[1], v.z());
         }
     }
 
@@ -2111,18 +1334,18 @@ public class UIClips extends UIElement
     {
         Vector3i data = grabbedData.get(grabbedData.size() - 1);
         Clip clip = grabbedClips.get(grabbedClips.size() - 1);
-        float tick = fromMilliTick(data.x());
+        int tick = data.x();
         int duration = data.z();
-        float newTick = fromMilliTick(data.x() + dx);
-        int newDuration = duration - Math.round(fromMilliTick(dx));
-        float snapped = fromMilliTick(this.snapMilli(toMilliTick(newTick)));
-        float minLeft = (float) others.stream()
-            .filter((o) -> this.sameLayer(o, clip) && o.tick.get() + o.duration.get() <= tick + 1e-4F)
-            .mapToDouble((o) -> o.tick.get() + o.duration.get())
+        int newTick = tick + dx;
+        int newDuration = duration - dx;
+        int snapped = this.snap(newTick);
+        int minLeft = others.stream()
+            .filter((o) -> this.sameLayer(o, clip) && o.tick.get() + o.duration.get() <= tick)
+            .mapToInt((o) -> o.tick.get() + o.duration.get())
             .max()
             .orElse(0);
 
-        newDuration += Math.round(newTick - snapped);
+        newDuration += newTick - snapped;
         newTick = Math.max(minLeft, snapped);
 
         if (newDuration < 1)
@@ -2136,44 +1359,28 @@ public class UIClips extends UIElement
 
     private void dragRightEdge(List<Clip> others, int dx, int dy)
     {
-        Vector3i data = this.grabbedData.get(this.grabbedData.size() - 1);
-        Clip clip = this.grabbedClips.get(this.grabbedClips.size() - 1);
-        float tick = fromMilliTick(data.x());
+        Vector3i data = grabbedData.get(grabbedData.size() - 1);
+        Clip clip = grabbedClips.get(grabbedClips.size() - 1);
+        int tick = data.x();
         int duration = data.z();
-        float originalEnd = tick + duration;
-        float snapped = fromMilliTick(this.snapMilli(toMilliTick(tick + duration) + dx));
-        int newDuration = Math.max(1, Math.round(snapped - tick));
-        float desiredEnd = tick + newDuration;
+        int newDuration = duration + dx;
+        int snapped = this.snap(tick + newDuration);
+        int maxRight = others.stream()
+            .filter((o) -> this.sameLayer(o, clip) && o.tick.get() >= tick + duration)
+            .mapToInt((o) -> o.tick.get())
+            .min()
+            .orElse(Integer.MAX_VALUE);
 
-        /* Push same-layer clips ahead instead of clamping/overlapping.
-         * Alt keeps others empty so free overlap still works. */
-        if (!others.isEmpty() && this.otherClipData.size() == this.otherClips.size())
+        newDuration = snapped - tick;
+
+        if (tick + newDuration >= maxRight)
         {
-            float nextStart = Float.POSITIVE_INFINITY;
+            newDuration = maxRight - tick;
+        }
 
-            for (int i = 0; i < this.otherClips.size(); i++)
-            {
-                Clip other = this.otherClips.get(i);
-                Vector3i od = this.otherClipData.get(i);
-
-                if (this.sameLayer(other, clip) && fromMilliTick(od.x()) >= originalEnd - 1e-4F)
-                {
-                    nextStart = Math.min(nextStart, fromMilliTick(od.x()));
-                }
-            }
-
-            float overflow = desiredEnd > nextStart ? desiredEnd - nextStart : 0F;
-
-            for (int i = 0; i < this.otherClips.size(); i++)
-            {
-                Clip other = this.otherClips.get(i);
-                Vector3i od = this.otherClipData.get(i);
-
-                if (this.sameLayer(other, clip) && fromMilliTick(od.x()) >= originalEnd - 1e-4F)
-                {
-                    this.setClipData(other, fromMilliTick(od.x()) + overflow, od.y(), od.z());
-                }
-            }
+        if (newDuration < 1)
+        {
+            newDuration = 1;
         }
 
         this.setClipData(clip, tick, data.y(), newDuration);
@@ -2186,9 +1393,8 @@ public class UIClips extends UIElement
             .flatMap((i) ->
             {
                 Vector3i v = data.get(i);
-                float tick = fromMilliTick(v.x());
-                int left = this.toGraphX(tick);
-                int right = this.toGraphX(tick + v.z());
+                int left = this.toGraphX(v.x());
+                int right = this.toGraphX(v.x() + v.z());
 
                 return Stream.of(new Anchor(i, true, left), new Anchor(i, false, right));
             })
@@ -2217,18 +1423,18 @@ public class UIClips extends UIElement
         {
             Vector3i v = data.get(i);
 
-            float newTick = fromMilliTick(v.x() + dx);
+            int newTick = v.x() + dx;
             int newLayer = v.y() + dy;
-            float newEnd = newTick + v.z();
+            int newDuration = newTick + v.z();
 
-            if (newTick < 0F || newLayer < 0)
+            if (newTick < 0 || newLayer < 0)
             {
                 return true;
             }
 
             for (Clip other : others)
             {
-                if (other.layer.get() == newLayer && MathUtils.isInside(newTick, newEnd, other.tick.get(), other.tick.get() + other.duration.get()))
+                if (other.layer.get() == newLayer && MathUtils.isInside(newTick, newDuration, other.tick.get(), other.tick.get() + other.duration.get()))
                 {
                     return true;
                 }
@@ -2243,246 +1449,32 @@ public class UIClips extends UIElement
         return a.layer.get().equals(b.layer.get());
     }
 
-    private int getClipOffset(Clip clip)
+    private void setClipData(Clip clip, int newTick, int newLayer, int newDuration)
     {
-        if (clip instanceof AudioClip audio)
+        if (clip.tick.get() != newTick && clip.duration.get() != newDuration)
         {
-            return audio.offset.get();
-        }
-        else if (clip instanceof VideoClip video)
-        {
-            return video.offset.get();
+            clip.shiftLeft(newTick);
         }
 
-        return 0;
+        clip.tick.set(newTick);
+        clip.duration.set(newDuration);
+        clip.layer.set(newLayer);
     }
 
-    private void setClipOffset(Clip clip, int offset, boolean direct)
+    private int snap(int tick)
     {
-        if (clip instanceof AudioClip audio)
+        if (Window.isAltPressed())
         {
-            if (direct)
-            {
-                audio.offset.setDirect(offset);
-            }
-            else
-            {
-                audio.offset.set(offset);
-            }
-        }
-        else if (clip instanceof VideoClip video)
-        {
-            if (direct)
-            {
-                video.offset.setDirect(offset);
-            }
-            else
-            {
-                video.offset.set(offset);
-            }
-        }
-    }
-
-    private ValueInt getClipOffsetValue(Clip clip)
-    {
-        if (clip instanceof AudioClip audio)
-        {
-            return audio.offset;
-        }
-        else if (clip instanceof VideoClip video)
-        {
-            return video.offset;
-        }
-
-        return null;
-    }
-
-    private void setClipData(Clip clip, float newTick, int newLayer, int newDuration)
-    {
-        if (Math.abs(clip.tick.get() - newTick) > 1e-4F && clip.duration.get() != newDuration)
-        {
-            clip.shiftLeft(Math.round(newTick), this.canGrab);
-        }
-
-        if (this.canGrab)
-        {
-            clip.tick.setDirect(newTick);
-            clip.duration.setDirect(newDuration);
-            clip.layer.setDirect(newLayer);
-        }
-        else
-        {
-            clip.tick.set(newTick);
-            clip.duration.set(newDuration);
-            clip.layer.set(newLayer);
-        }
-    }
-
-    private void submitGrabbedUndo()
-    {
-        if (!this.canGrab || this.grabbedClips.isEmpty())
-        {
-            return;
-        }
-
-        boolean hasChanges = false;
-        List<Clip> changedClips = new ArrayList<>();
-        List<Vector3i> initialDataList = new ArrayList<>();
-        List<Integer> initialOffsetsList = new ArrayList<>();
-        List<Vector3i> finalDataList = new ArrayList<>();
-        List<Integer> finalOffsetsList = new ArrayList<>();
-
-        /* Check grabbed clips */
-        for (int i = 0; i < this.grabbedClips.size() && i < this.grabbedData.size(); i++)
-        {
-            Clip clip = this.grabbedClips.get(i);
-            Vector3i initial = this.grabbedData.get(i);
-            int initialOffset = i < this.grabbedOffsets.size() ? this.grabbedOffsets.get(i) : this.getClipOffset(clip);
-            int currentOffset = this.getClipOffset(clip);
-
-            if (initial.x() != toMilliTick(clip.tick.get()) || initial.y() != clip.layer.get()
-                || initial.z() != clip.duration.get() || initialOffset != currentOffset)
-            {
-                hasChanges = true;
-                changedClips.add(clip);
-                initialDataList.add(initial);
-                initialOffsetsList.add(initialOffset);
-                finalDataList.add(new Vector3i(toMilliTick(clip.tick.get()), clip.layer.get(), clip.duration.get()));
-                finalOffsetsList.add(currentOffset);
-            }
-        }
-
-        /* Check other clips (e.g. ripple resize) */
-        for (int i = 0; i < this.otherClips.size() && i < this.otherClipData.size(); i++)
-        {
-            Clip clip = this.otherClips.get(i);
-            Vector3i initial = this.otherClipData.get(i);
-            int initialOffset = i < this.otherOffsets.size() ? this.otherOffsets.get(i) : this.getClipOffset(clip);
-            int currentOffset = this.getClipOffset(clip);
-
-            if (initial.x() != toMilliTick(clip.tick.get()) || initial.y() != clip.layer.get()
-                || initial.z() != clip.duration.get() || initialOffset != currentOffset)
-            {
-                hasChanges = true;
-                changedClips.add(clip);
-                initialDataList.add(initial);
-                initialOffsetsList.add(initialOffset);
-                finalDataList.add(new Vector3i(toMilliTick(clip.tick.get()), clip.layer.get(), clip.duration.get()));
-                finalOffsetsList.add(currentOffset);
-            }
-        }
-
-        if (!hasChanges)
-        {
-            return;
-        }
-
-        /* 1. Temporarily revert all changed clips to initial values directly */
-        for (int i = 0; i < changedClips.size(); i++)
-        {
-            Clip clip = changedClips.get(i);
-            Vector3i initial = initialDataList.get(i);
-            int initialOffset = initialOffsetsList.get(i);
-
-            clip.tick.setDirect(fromMilliTick(initial.x()));
-            clip.layer.setDirect(initial.y());
-            clip.duration.setDirect(initial.z());
-            this.setClipOffset(clip, initialOffset, true);
-        }
-
-        /* 2. Fire preNotify(FLAG_UNMERGEABLE) on all properties that actually changed */
-        for (int i = 0; i < changedClips.size(); i++)
-        {
-            Clip clip = changedClips.get(i);
-            Vector3i initial = initialDataList.get(i);
-            Vector3i finalData = finalDataList.get(i);
-            int initialOffset = initialOffsetsList.get(i);
-            int finalOffset = finalOffsetsList.get(i);
-
-            if (initial.x() != finalData.x())
-            {
-                clip.tick.preNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initial.y() != finalData.y())
-            {
-                clip.layer.preNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initial.z() != finalData.z())
-            {
-                clip.duration.preNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initialOffset != finalOffset)
-            {
-                ValueInt offsetValue = this.getClipOffsetValue(clip);
-
-                if (offsetValue != null)
-                {
-                    offsetValue.preNotify(IValueListener.FLAG_UNMERGEABLE);
-                }
-            }
-        }
-
-        /* 3. Set all changed clips to their final values directly */
-        for (int i = 0; i < changedClips.size(); i++)
-        {
-            Clip clip = changedClips.get(i);
-            Vector3i finalData = finalDataList.get(i);
-            int finalOffset = finalOffsetsList.get(i);
-
-            clip.tick.setDirect(fromMilliTick(finalData.x()));
-            clip.layer.setDirect(finalData.y());
-            clip.duration.setDirect(finalData.z());
-            this.setClipOffset(clip, finalOffset, true);
-        }
-
-        /* 4. Fire postNotify(FLAG_UNMERGEABLE) on all properties that actually changed */
-        for (int i = 0; i < changedClips.size(); i++)
-        {
-            Clip clip = changedClips.get(i);
-            Vector3i initial = initialDataList.get(i);
-            Vector3i finalData = finalDataList.get(i);
-            int initialOffset = initialOffsetsList.get(i);
-            int finalOffset = finalOffsetsList.get(i);
-
-            if (initial.x() != finalData.x())
-            {
-                clip.tick.postNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initial.y() != finalData.y())
-            {
-                clip.layer.postNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initial.z() != finalData.z())
-            {
-                clip.duration.postNotify(IValueListener.FLAG_UNMERGEABLE);
-            }
-            if (initialOffset != finalOffset)
-            {
-                ValueInt offsetValue = this.getClipOffsetValue(clip);
-
-                if (offsetValue != null)
-                {
-                    offsetValue.postNotify(IValueListener.FLAG_UNMERGEABLE);
-                }
-            }
-        }
-    }
-
-    private int snapMilli(int milliTick)
-    {
-        /* Alt = free overlap / no snap. Shift = millimeter move, also no marker snap. */
-        if (Window.isAltPressed() || Window.isShiftPressed())
-        {
-            return milliTick;
+            return tick;
         }
 
         int diff = 11;
-        int closest = milliTick;
+        int closest = tick;
 
         for (int point : this.snappingPoints)
         {
-            int pointX = this.toGraphX(fromMilliTick(point));
-            int abs = Math.abs(this.toGraphX(fromMilliTick(milliTick)) - pointX);
+            int pointX = this.toGraphX(point);
+            int abs = Math.abs(this.toGraphX(tick) - pointX);
 
             if (abs <= 10 && abs < diff)
             {
@@ -2518,13 +1510,6 @@ public class UIClips extends UIElement
     {
         if (this.scrolling)
         {
-            if (!Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_3))
-            {
-                this.resetStates();
-
-                return;
-            }
-
             this.scale.setShift(this.scale.getShift() - (mouseX - this.lastX) / this.scale.getZoom());
             this.vertical.scrollBy(this.lastY - mouseY);
             this.vertical.clamp();
@@ -2547,26 +1532,28 @@ public class UIClips extends UIElement
         int h = LAYER_HEIGHT;
         int leftEdge = this.toGraphX(0);
 
-        this.renderTimelineBackground(context, leftEdge, h);
-
         if (leftEdge > this.area.x)
         {
-            batcher.box(this.area.x, this.area.y, Math.min(leftEdge, this.area.ex()), this.area.ey(), 0x9905070b);
+            batcher.box(this.area.x, this.area.y, Math.min(leftEdge, this.area.ex()), this.area.ey(), Colors.A75);
         }
 
-        batcher.clip(this.area, context);
-
-        this.renderTickMarkers(context, area.y, area.h);
-
-        batcher.unclip(context);
+        area.render(batcher, Colors.A50);
         batcher.clip(this.vertical.area, context);
 
         for (int i = 0; i < this.layers; i++)
         {
             int ly = this.toLayerY(i);
 
-            batcher.box(this.area.x, ly + h - 1, this.area.ex(), ly + h, 0x16000000);
+            if (i % 2 != 0)
+            {
+                batcher.box(leftEdge, ly, this.area.ex(), ly + h, Colors.A50);
+            }
         }
+
+        batcher.unclip(context);
+        batcher.clip(this.area, context);
+
+        this.renderTickMarkers(context, area.y, area.h);
 
         batcher.unclip(context);
         batcher.clip(this.vertical.area, context);
@@ -2589,9 +1576,7 @@ public class UIClips extends UIElement
 
             renderer.renderClip(context, this, clip, clipArea, selected, this.delegate.getClip() == clip);
 
-            int clipHandle = TimelineToolbarPointerBlock.blocksPointer(context)
-                ? -1
-                : this.getClipHandle(clip, context, h);
+            int clipHandle = this.getClipHandle(clip, context, h);
             int color = this.grabMode != 0 ? Colors.WHITE : Colors.A50;
 
             if (clipHandle == 1 || (selected && this.grabMode == 1))
@@ -2623,32 +1608,9 @@ public class UIClips extends UIElement
         batcher.unclip(context);
     }
 
-    private void renderTimelineBackground(UIContext context, int leftEdge, int h)
-    {
-        Batcher2D batcher = context.batcher;
-
-        batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xee0b0d12);
-        batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.y + RULER_HEIGHT, 0xff111115);
-        batcher.box(this.area.x, this.area.y + RULER_HEIGHT - 1, this.area.ex(), this.area.y + RULER_HEIGHT, 0x22ffffff);
-
-        batcher.clip(this.vertical.area, context);
-
-        for (int i = 0; i < this.layers; i++)
-        {
-            int ly = this.toLayerY(i);
-
-            if (i % 2 != 0)
-            {
-                batcher.box(Math.max(leftEdge, this.area.x), ly, this.area.ex(), ly + h, 0x26000000);
-            }
-        }
-
-        batcher.unclip(context);
-    }
-
     private Area getClipArea(Clip clip, Area area, int h)
     {
-        float tick = clip.tick.get();
+        int tick = clip.tick.get();
         int x = this.toGraphX(tick);
         int y = this.toLayerY(clip.layer.get());
         int w = this.toGraphX(tick + clip.duration.get()) - x;
@@ -2658,59 +1620,9 @@ public class UIClips extends UIElement
         return area;
     }
 
-    /**
-     * Hit box for selection/handles: same as draw area but never thinner than
-     * {@link #MIN_CLIP_HIT_WIDTH} so fractional-tick clips stay easy to click.
-     */
-    private Area getClipHitArea(Clip clip, Area area, int h)
-    {
-        this.getClipArea(clip, area, h);
-
-        if (area.w < MIN_CLIP_HIT_WIDTH)
-        {
-            int pad = MIN_CLIP_HIT_WIDTH - area.w;
-
-            area.x -= pad / 2;
-            area.w = MIN_CLIP_HIT_WIDTH;
-        }
-
-        return area;
-    }
-
-    /**
-     * Pick by on-screen rect (float tick positions), not floored world ticks.
-     * Floored ticks miss clips that start between integers (e.g. 1.5).
-     */
-    private Clip findClipAt(int mouseX, int mouseY)
-    {
-        int layerIndex = this.fromLayerY(mouseY);
-
-        if (layerIndex < 0)
-        {
-            return null;
-        }
-
-        Clip match = null;
-
-        for (Clip clip : this.clips.get())
-        {
-            if (clip.layer.get() != layerIndex)
-            {
-                continue;
-            }
-
-            if (this.getClipHitArea(clip, CLIP_HIT_AREA, LAYER_HEIGHT).isInside(mouseX, mouseY))
-            {
-                match = clip;
-            }
-        }
-
-        return match;
-    }
-
     private int getClipHandle(Clip clip, UIContext context, int h)
     {
-        Area clipArea = this.getClipHitArea(clip, CLIP_AREA, h);
+        Area clipArea = this.getClipArea(clip, CLIP_AREA, h);
         int separation = Math.min(clipArea.w / 2, 5);
 
         if (clipArea.isInside(context))
@@ -2737,56 +1649,16 @@ public class UIClips extends UIElement
 
     private void renderAddPreview(UIContext context, int h)
     {
-        if (this.placementPreview != null)
+        if (this.addPreview == null)
         {
-            this.renderPreviewBox(context, h, this.placementPreview, true);
+            return;
         }
 
-        if (this.addPreview != null)
-        {
-            this.renderPreviewBox(context, h, this.addPreview, true);
-        }
-    }
+        int x = this.toGraphX(this.addPreview.x);
+        int y = this.toLayerY(this.addPreview.y);
+        int d = this.toGraphX(this.addPreview.x + this.addPreview.z);
 
-    private void renderPreviewBox(UIContext context, int h, Vector3i preview, boolean pulsing)
-    {
-        float tick = fromMilliTick(preview.x);
-        int x = this.toGraphX(tick);
-        int y = this.toLayerY(preview.y);
-        int d = this.toGraphX(tick + preview.z);
-
-        if (pulsing)
-        {
-            UIClipPlacementInteraction.renderPulsingOutline(context, x, y, d, y + h);
-        }
-        else
-        {
-            context.batcher.outline(x, y, d, y + h, Colors.WHITE);
-        }
-    }
-
-    /**
-     * Keep ruler / snap loops bounded to roughly screen-width iterations.
-     * Huge clip durations used to set the view span to billions of ticks and hang here.
-     */
-    private int capRulerEnd(int start, int end, int mult)
-    {
-        if (mult <= 0)
-        {
-            return start;
-        }
-
-        int maxMarkers = Math.max(this.area.w * 2, 512) + 2;
-        long span = (long) end - (long) start;
-
-        if (span / mult > maxMarkers)
-        {
-            long capped = (long) start + (long) mult * maxMarkers;
-
-            return capped > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) capped;
-        }
-
-        return end;
+        context.batcher.outline(x, y, d, y + h, Colors.WHITE);
     }
 
     /**
@@ -2794,37 +1666,24 @@ public class UIClips extends UIElement
      */
     private void renderTickMarkers(UIContext context, int y, int h)
     {
-        TimelineRuler.Step step = TimelineRuler.steps(this.scale);
-        int mult = step.minor;
+        int mult = this.scale.getMult() * 2;
         int start = (int) this.scale.getMinValue();
         int end = (int) this.scale.getMaxValue();
         int max = Integer.MAX_VALUE;
-        int major = step.major;
 
         start -= start % mult;
         end -= end % mult;
 
         start = MathUtils.clamp(start, 0, max);
         end = MathUtils.clamp(end, mult, max);
-        end = this.capRulerEnd(start, end, mult);
 
         for (int j = start; j <= end; j += mult)
         {
             int xx = this.toGraphX(j);
-            boolean majorTick = j % major == 0;
-            int lineColor = majorTick ? 0x1cffffff : 0x0affffff;
-            int tickBottom = this.area.y + RULER_HEIGHT;
-            int tickHeight = majorTick ? 8 : 4;
+            String value = TimeUtils.formatTime(j);
 
-            context.batcher.box(xx, y, xx + 1, y + h, lineColor);
-            context.batcher.box(xx, tickBottom - tickHeight, xx + 1, tickBottom, majorTick ? 0xddffffff : 0x77ffffff);
-
-            if (majorTick)
-            {
-                String value = TimeUtils.formatTime(j);
-
-                context.batcher.textShadow(value, xx + 4, this.area.y + 2, Colors.WHITE);
-            }
+            context.batcher.box(xx, y, xx + 1, y + h, Colors.setA(Colors.WHITE, 0.2F));
+            context.batcher.textShadow(value, xx + 3, this.area.y + 4, Colors.WHITE);
         }
     }
 
@@ -2875,249 +1734,5 @@ public class UIClips extends UIElement
     private interface ClipTransformStrategy
     {
         public void apply(List<Clip> others, List<Clip> grabbedClips, List<Vector3i> grabbedData, int dx, int dy);
-    }
-
-    private static class UITabButton extends UIButton
-    {
-        private final Icon icon;
-        private final IKey tooltip;
-        private boolean active;
-        private boolean noSeparator;
-
-        public UITabButton(IKey label, IKey tooltip, Icon icon, Consumer<UIButton> callback)
-        {
-            super(label, callback);
-            this.tooltip = tooltip;
-            this.icon = icon;
-            this.tooltip(this.tooltip, Direction.TOP);
-        }
-
-        public void noSeparator()
-        {
-            this.noSeparator = true;
-        }
-
-        public void setActive(boolean active)
-        {
-            this.active = active;
-        }
-
-        @Override
-        protected void renderSkin(UIContext context)
-        {
-            boolean enabled = this.isEnabled();
-            int primary = BBSSettings.primaryColor.get();
-            int color = this.active ? primary : 0;
-            int iconColor = this.active ? Colors.WHITE : 0xddffffff;
-
-            if (!enabled)
-            {
-                iconColor = 0x80404040;
-            }
-            else if (this.hover)
-            {
-                color = this.active ? Colors.mulRGB(primary, 0.9F) : Colors.A25;
-                iconColor = Colors.WHITE;
-            }
-
-            if (color != 0)
-            {
-                this.area.render(context.batcher, this.active ? (color | Colors.A100) : color);
-            }
-
-            if (!this.noSeparator)
-            {
-                context.batcher.box(this.area.ex() - 1, this.area.y + 2, this.area.ex(), this.area.ey() - 2, 0x22ffffff);
-            }
-
-            context.batcher.icon(this.icon, iconColor, this.area.mx(), this.area.my(), 0.5F, 0.5F);
-        }
-    }
-
-    private enum ClipTab
-    {
-        CAMERA,
-        RESOURCE,
-        SCREEN,
-        ANCHOR,
-        EXTRAS
-    }
-
-    private static class UIClipsAddContextMenu extends UISimpleContextMenu
-    {
-        private final UIElement tabs;
-        private final UIElement separator;
-        private final UIButton camera;
-        private final UIButton resource;
-        private final UIButton screen;
-        private final UIButton anchor;
-        private final UIButton extras;
-
-        private final List<ContextAction> cameraActions = new ArrayList<>();
-        private final List<ContextAction> resourceActions = new ArrayList<>();
-        private final List<ContextAction> screenActions = new ArrayList<>();
-        private final List<ContextAction> anchorActions = new ArrayList<>();
-        private final List<ContextAction> extrasActions = new ArrayList<>();
-
-        private ClipTab tab = ClipTab.CAMERA;
-
-        public UIClipsAddContextMenu(UIClips uiClips, Vector3i preview)
-        {
-            super();
-
-            for (TimelineClipTypeGroups.ClipGroup group : TimelineClipTypeGroups.forCamera(uiClips.factory))
-            {
-                List<ContextAction> target = this.actionsForGroup(group.label);
-
-                if (target == null)
-                {
-                    continue;
-                }
-
-                for (Link type : group.types)
-                {
-                    IKey typeKey = UIKeys.CAMERA_TIMELINE_CONTEXT_ADD_CLIP_TYPE.format(UIKeys.C_CLIP.get(type));
-                    ClipFactoryData data = uiClips.factory.getData(type);
-                    Runnable runnable = () -> uiClips.addClip(type, fromMilliTick(preview.x), preview.y, preview.z);
-
-                    target.add(new ColorfulContextAction(data.icon, typeKey, runnable, data.color));
-                }
-            }
-
-            this.camera = new UITabButton(IKey.EMPTY, UIKeys.CAMERA_TIMELINE_CLIPS_TABS_CAMERA, Icons.CAMERA, (b) -> this.setTab(ClipTab.CAMERA));
-            this.resource = new UITabButton(IKey.EMPTY, UIKeys.CAMERA_TIMELINE_CLIPS_TABS_RESOURCE, Icons.FOLDER, (b) -> this.setTab(ClipTab.RESOURCE));
-            this.screen = new UITabButton(IKey.EMPTY, UIKeys.CAMERA_TIMELINE_CLIPS_TABS_SCREEN, Icons.CONSOLE, (b) -> this.setTab(ClipTab.SCREEN));
-            this.anchor = new UITabButton(IKey.EMPTY, UIKeys.CAMERA_TIMELINE_CLIPS_TABS_ANCHOR, Icons.ORBIT, (b) -> this.setTab(ClipTab.ANCHOR));
-            this.extras = new UITabButton(IKey.EMPTY, UIKeys.CAMERA_TIMELINE_CLIPS_TABS_EXTRAS, Icons.MORE, (b) -> this.setTab(ClipTab.EXTRAS));
-
-            ((UITabButton) this.extras).noSeparator();
-
-            this.tabs = UI.row(0, this.camera, this.resource, this.screen, this.anchor, this.extras);
-            this.separator = new UIElement()
-            {
-                @Override
-                public void render(UIContext context)
-                {
-                    context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0x44ffffff);
-                }
-            };
-
-            this.tabs.relative(this).w(1F).h(20).row(0).resize();
-            this.separator.relative(this).xy(0, 20).w(1F).h(1);
-            this.actions.relative(this).xy(0, 21).w(1F).h(1F, -21);
-            this.add(this.tabs, this.separator);
-
-            this.camera.setEnabled(!this.cameraActions.isEmpty());
-            this.resource.setEnabled(!this.resourceActions.isEmpty());
-            this.screen.setEnabled(!this.screenActions.isEmpty());
-            this.anchor.setEnabled(!this.anchorActions.isEmpty());
-            this.extras.setEnabled(!this.extrasActions.isEmpty());
-
-            if (!this.cameraActions.isEmpty()) this.setTab(ClipTab.CAMERA);
-            else if (!this.resourceActions.isEmpty()) this.setTab(ClipTab.RESOURCE);
-            else if (!this.screenActions.isEmpty()) this.setTab(ClipTab.SCREEN);
-            else if (!this.anchorActions.isEmpty()) this.setTab(ClipTab.ANCHOR);
-            else this.setTab(ClipTab.EXTRAS);
-        }
-
-        private List<ContextAction> actionsForGroup(IKey label)
-        {
-            if (label == UIKeys.CAMERA_TIMELINE_CLIPS_TABS_CAMERA)
-            {
-                return this.cameraActions;
-            }
-
-            if (label == UIKeys.CAMERA_TIMELINE_CLIPS_TABS_RESOURCE)
-            {
-                return this.resourceActions;
-            }
-
-            if (label == UIKeys.CAMERA_TIMELINE_CLIPS_TABS_SCREEN)
-            {
-                return this.screenActions;
-            }
-
-            if (label == UIKeys.CAMERA_TIMELINE_CLIPS_TABS_ANCHOR)
-            {
-                return this.anchorActions;
-            }
-
-            if (label == UIKeys.CAMERA_TIMELINE_CLIPS_TABS_EXTRAS)
-            {
-                return this.extrasActions;
-            }
-
-            return this.extrasActions;
-        }
-
-        private void setTab(ClipTab tab)
-        {
-            this.tab = tab;
-            ((UITabButton) this.camera).setActive(tab == ClipTab.CAMERA);
-            ((UITabButton) this.resource).setActive(tab == ClipTab.RESOURCE);
-            ((UITabButton) this.screen).setActive(tab == ClipTab.SCREEN);
-            ((UITabButton) this.anchor).setActive(tab == ClipTab.ANCHOR);
-            ((UITabButton) this.extras).setActive(tab == ClipTab.EXTRAS);
-
-            List<ContextAction> activeList;
-            switch (tab)
-            {
-                case CAMERA: activeList = this.cameraActions; break;
-                case RESOURCE: activeList = this.resourceActions; break;
-                case SCREEN: activeList = this.screenActions; break;
-                case ANCHOR: activeList = this.anchorActions; break;
-                default: activeList = this.extrasActions; break;
-            }
-
-            this.actions.setList(new ArrayList<>(activeList));
-
-            UIContext context = this.getContext();
-            if (context != null)
-            {
-                this.w(this.calculateWidth(context));
-                this.h(this.calculateHeight());
-                this.bounds(context.menu.overlay, 5);
-                this.resize();
-            }
-        }
-
-        @Override
-        public void setMouse(UIContext context)
-        {
-            int w = this.calculateWidth(context);
-            int h = this.calculateHeight();
-
-            this.xy(context.mouseX(), context.mouseY()).w(w).h(h).bounds(context.menu.overlay, 5);
-            this.resize();
-        }
-
-        private int calculateWidth(UIContext context)
-        {
-            int w = 120;
-
-            for (ContextAction action : this.cameraActions) w = Math.max(w, action.getWidth(context.batcher.getFont()));
-            for (ContextAction action : this.resourceActions) w = Math.max(w, action.getWidth(context.batcher.getFont()));
-            for (ContextAction action : this.screenActions) w = Math.max(w, action.getWidth(context.batcher.getFont()));
-            for (ContextAction action : this.anchorActions) w = Math.max(w, action.getWidth(context.batcher.getFont()));
-            for (ContextAction action : this.extrasActions) w = Math.max(w, action.getWidth(context.batcher.getFont()));
-
-            return w % 4 == 0 ? w : w + (4 - w % 4);
-        }
-
-        private int calculateHeight()
-        {
-            int actionsSize;
-            switch (this.tab)
-            {
-                case CAMERA: actionsSize = this.cameraActions.size(); break;
-                case RESOURCE: actionsSize = this.resourceActions.size(); break;
-                case SCREEN: actionsSize = this.screenActions.size(); break;
-                case ANCHOR: actionsSize = this.anchorActions.size(); break;
-                default: actionsSize = this.extrasActions.size(); break;
-            }
-
-            actionsSize = Math.max(actionsSize, 1);
-            return 21 + actionsSize * this.actions.scroll.scrollItemSize;
-        }
     }
 }

@@ -1,7 +1,6 @@
 package mchorse.bbs_mod.actions;
 
 import mchorse.bbs_mod.BBSSettings;
-
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
@@ -45,7 +44,7 @@ public class DamageControl
             }
         }
 
-        this.blocks.add(new BlockCapture(new BlockPos(pos), state, entity == null ? null : entity.createNbtWithId(this.world.getRegistryManager())));
+        this.blocks.add(new BlockCapture(new BlockPos(pos), state, entity == null ? null : entity.createNbtWithId()));
     }
 
     public void addEntity(Entity entity)
@@ -60,28 +59,19 @@ public class DamageControl
 
     public void restore()
     {
-        boolean prev = this.enable;
-        this.enable = false;
-
-        List<BlockCapture> blocksCopy = new ArrayList<>(this.blocks);
-        List<Entity> entitiesCopy = new ArrayList<>(this.entities);
-
-        this.blocks.clear();
-        this.entities.clear();
-
-        for (BlockCapture block : blocksCopy)
+        for (BlockCapture block : this.blocks)
         {
             this.world.setBlockState(block.pos, block.lastState, 2);
 
             if (block.blockEntity != null)
             {
-                BlockEntity blockEntity = BlockEntity.createFromNbt(block.pos, block.lastState, block.blockEntity, this.world.getRegistryManager());
+                BlockEntity blockEntity = BlockEntity.createFromNbt(block.pos, block.lastState, block.blockEntity);
 
                 this.world.addBlockEntity(blockEntity);
             }
         }
 
-        for (Entity entity : entitiesCopy)
+        for (Entity entity : this.entities)
         {
             if (!entity.isRemoved())
             {
@@ -89,7 +79,8 @@ public class DamageControl
             }
         }
 
-        this.enable = prev;
+        this.blocks.clear();
+        this.entities.clear();
     }
 
     private static class BlockCapture

@@ -1,10 +1,8 @@
 package mchorse.bbs_mod.cubic.render.vao;
 
 import mchorse.bbs_mod.client.BBSRendering;
-
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
-
 import org.lwjgl.opengl.GL30;
 
 public class ModelVAO implements IModelVAO
@@ -24,17 +22,8 @@ public class ModelVAO implements IModelVAO
 
     public void delete()
     {
-        if (this.vao != 0)
-        {
-            GL30.glDeleteVertexArrays(this.vao);
-            this.vao = 0;
-        }
-
-        if (this.vao2 != 0)
-        {
-            GL30.glDeleteVertexArrays(this.vao2);
-            this.vao2 = 0;
-        }
+        GL30.glDeleteVertexArrays(this.vao);
+        GL30.glDeleteVertexArrays(this.vao2);
     }
 
     public void upload(ModelVAOData data)
@@ -103,25 +92,10 @@ public class ModelVAO implements IModelVAO
         boolean hasShaders = isShadersEnabled();
         int vao = hasShaders || format == VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL ? this.vao : this.vao2;
 
-        if (vao == 0 || !GL30.glIsVertexArray(vao))
-        {
-            return;
-        }
-
-        /* Restore previous binding — glBindVertexArray(0) leaves no array object active,
-         * so the next Batcher2D/Sodium BufferBuilder path spam GL_INVALID_OPERATION
-         * ("Array object is not active") once per form-list preview. */
-        int previousVAO = GL30.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
-
         GL30.glBindVertexArray(vao);
 
         if (vao == this.vao)
         {
-            /* Explicitly disable these attributes to ensure constant values are used */
-            GL30.glDisableVertexAttribArray(Attributes.COLOR);
-            GL30.glDisableVertexAttribArray(Attributes.LIGHTMAP_UV);
-            GL30.glDisableVertexAttribArray(Attributes.OVERLAY_UV);
-
             GL30.glVertexAttrib4f(Attributes.COLOR, r, g, b, a);
             GL30.glVertexAttribI2i(Attributes.OVERLAY_UV, overlay & '\uffff', overlay >> 16 & '\uffff');
             GL30.glVertexAttribI2i(Attributes.LIGHTMAP_UV, light & '\uffff', light >> 16 & '\uffff');
@@ -139,7 +113,7 @@ public class ModelVAO implements IModelVAO
         else GL30.glDisableVertexAttribArray(Attributes.TANGENTS);
 
         GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, this.count);
-        GL30.glBindVertexArray(previousVAO);
+        GL30.glBindVertexArray(0);
     }
 
     public static boolean isShadersEnabled()

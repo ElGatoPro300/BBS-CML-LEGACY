@@ -18,11 +18,6 @@ public class DynamicSourcePack implements ISourcePack
         this.main = main;
     }
 
-    public void setMain(ISourcePack main)
-    {
-        this.main = main;
-    }
-
     public void setSecondary(ISourcePack secondary)
     {
         this.secondary = secondary;

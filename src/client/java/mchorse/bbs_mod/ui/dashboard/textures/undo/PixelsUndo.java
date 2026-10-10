@@ -4,7 +4,6 @@ import mchorse.bbs_mod.utils.Pair;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.resources.Pixels;
 import mchorse.bbs_mod.utils.undo.IUndo;
-
 import org.joml.Vector2i;
 
 import java.util.HashMap;
@@ -26,17 +25,6 @@ public class PixelsUndo implements IUndo<Pixels>
 
         pair.b = color.copy();
         pixels.setColor(x, y, color);
-    }
-
-    public void revertColor(Pixels pixels, int x, int y)
-    {
-        Vector2i key = new Vector2i(x, y);
-        Pair<Color, Color> pair = this.pixels.remove(key);
-
-        if (pair != null && pair.a != null)
-        {
-            pixels.setColor(x, y, pair.a);
-        }
     }
 
     @Override

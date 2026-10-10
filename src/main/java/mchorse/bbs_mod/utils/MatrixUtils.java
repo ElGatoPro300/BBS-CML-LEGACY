@@ -1,8 +1,7 @@
 package mchorse.bbs_mod.utils;
 
-import org.joml.*;
-
 import org.jetbrains.annotations.Nullable;
+import org.joml.*;
 
 import java.lang.Math;
 

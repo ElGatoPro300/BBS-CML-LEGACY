@@ -8,11 +8,6 @@ import mchorse.bbs_mod.utils.interps.Lerps;
 
 public abstract class CameraClip extends Clip
 {
-    public boolean isPositionClip()
-    {
-        return true;
-    }
-
     public void shutdown(ClipContext context)
     {}
 
@@ -23,7 +18,7 @@ public abstract class CameraClip extends Clip
     {
         int duration = this.duration.get();
 
-        this.applyClip(context.setup(Math.round(this.tick.get()) + duration, duration, 0, 0), position);
+        this.applyClip(context.setup(this.tick.get() + duration, duration, 0, 0), position);
     }
 
     public void apply(ClipContext context, Position position)
@@ -35,9 +30,7 @@ public abstract class CameraClip extends Clip
 
         float factor = this.envelope.factorEnabled(this.duration.get(), context.relativeTick + context.transition);
 
-        /* Non-position clips (screen FX, etc.) apply envelope inside applyClip — do not
-         * lerp FOV/position here or fisheye FOV overscan gets double-attenuated. */
-        if (factor == 1 || !this.isPositionClip())
+        if (factor == 1)
         {
             this.applyClip(context, position);
         }

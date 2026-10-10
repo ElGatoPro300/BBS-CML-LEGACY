@@ -2,6 +2,7 @@ package mchorse.bbs_mod.ui.film.clips;
 
 import mchorse.bbs_mod.camera.clips.overwrite.KeyframeClip;
 import mchorse.bbs_mod.camera.data.Position;
+import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
@@ -10,12 +11,12 @@ import mchorse.bbs_mod.ui.film.utils.keyframes.UIFilmKeyframes;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIToggle;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
+import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clips;
 import mchorse.bbs_mod.utils.joml.Matrices;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
-
 import org.joml.Vector3f;
 
 public class UIKeyframeClip extends UIClip<KeyframeClip>
@@ -50,7 +51,7 @@ public class UIKeyframeClip extends UIClip<KeyframeClip>
         this.keyframes = new UIKeyframeEditor((consumer) -> new UIFilmKeyframes(this.editor, consumer));
         this.keyframes.view.backgroundRenderer((context) ->
         {
-            UIReplaysEditor.renderBackground(context, this.keyframes.view, (Clips) this.clip.getParent(), Math.round(this.clip.tick.get()), this.clip);
+            UIReplaysEditor.renderBackground(context, this.keyframes.view, (Clips) this.clip.getParent(), this.clip.tick.get());
         });
         this.keyframes.view.duration(() -> this.clip.duration.get());
         this.keyframes.setUndoId("keyframe_keyframes");
@@ -69,14 +70,14 @@ public class UIKeyframeClip extends UIClip<KeyframeClip>
     {
         super.registerPanels();
 
-        this.panels.add(this.section(UIKeys.CAMERA_PANELS_KEYFRAMES, this.edit));
+        this.panels.add(UI.column(UIClip.label(UIKeys.CAMERA_PANELS_KEYFRAMES), this.edit).marginTop(12));
     }
 
     @Override
     public void editClip(Position position)
     {
         Position newPos = position.copy();
-        long tick = this.editor.getCursor() - Math.round(this.clip.tick.get());
+        long tick = this.editor.getCursor() - this.clip.tick.get();
 
         if (!this.clip.distance.isEmpty())
         {
@@ -126,8 +127,25 @@ public class UIKeyframeClip extends UIClip<KeyframeClip>
     }
 
     @Override
-    protected UIKeyframeEditor resolveClipEmbeddableView(String undoId)
+    public void applyUndoData(MapType data)
     {
-        return undoId.equals(this.keyframes.getUndoId()) ? this.keyframes : null;
+        super.applyUndoData(data);
+
+        if (data.getString("embed").equals("keyframe"))
+        {
+            this.editor.embedView(this.keyframes);
+            this.keyframes.view.resetView();
+        }
+    }
+
+    @Override
+    public void collectUndoData(MapType data)
+    {
+        super.collectUndoData(data);
+
+        if (this.keyframes.hasParent())
+        {
+            data.putString("embed", "keyframe");
+        }
     }
 }

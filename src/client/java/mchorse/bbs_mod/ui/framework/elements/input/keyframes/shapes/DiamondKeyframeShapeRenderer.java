@@ -5,9 +5,7 @@ import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.utils.icons.Icon;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
-
 import net.minecraft.client.render.BufferBuilder;
-
 import org.joml.Matrix4f;
 
 public class DiamondKeyframeShapeRenderer implements IKeyframeShapeRenderer
@@ -29,9 +27,9 @@ public class DiamondKeyframeShapeRenderer implements IKeyframeShapeRenderer
     {
         float fOffset = offset * 1.5F;
 
-        builder.vertex(matrix, x, y - fOffset, 0F).color(c);
-        builder.vertex(matrix, x - fOffset, y, 0F).color(c);
-        builder.vertex(matrix, x, y + fOffset, 0F).color(c);
-        builder.vertex(matrix, x + fOffset, y, 0F).color(c);
+        builder.vertex(matrix, x, y - fOffset, 0F).color(c).next();
+        builder.vertex(matrix, x - fOffset, y, 0F).color(c).next();
+        builder.vertex(matrix, x, y + fOffset, 0F).color(c).next();
+        builder.vertex(matrix, x + fOffset, y, 0F).color(c).next();
     }
 }

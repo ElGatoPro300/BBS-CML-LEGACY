@@ -32,13 +32,7 @@ public class RemapperClip extends CameraClip
         factor *= duration;
         factor = MathUtils.clamp(factor, 0, duration - 0.0001F);
 
-        context.applyUnderneath(Math.round(this.tick.get()) + (int) factor, (float) (factor % 1), position);
-    }
-
-    @Override
-    public boolean isPositionClip()
-    {
-        return false;
+        context.applyUnderneath(this.tick.get() + (int) factor, (float) (factor % 1), position);
     }
 
     @Override

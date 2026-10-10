@@ -16,17 +16,15 @@ import mchorse.bbs_mod.ui.framework.elements.input.UITrackpad;
 import mchorse.bbs_mod.ui.particles.sections.UIParticleSchemeSection;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
-import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.interps.Lerps;
-
+import mchorse.bbs_mod.utils.MathUtils;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
-
 import org.joml.Matrix4f;
 import org.joml.Vector2d;
 
@@ -261,21 +259,23 @@ public class UICurve extends UIElement
         Matrix4f matrix = context.batcher.getContext().getMatrices().peek().getPositionMatrix();
         int c = this.curve.nodes.size();
 
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tessellator.getInstance().getBuffer();
+
+        builder.begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
 
         /* Top and bottom */
-        builder.vertex(matrix, this.area.x, this.graph.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
-        builder.vertex(matrix, this.area.ex(), this.graph.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
+        builder.vertex(matrix, this.area.x, this.graph.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
+        builder.vertex(matrix, this.area.ex(), this.graph.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
 
-        builder.vertex(matrix, this.area.x, this.graph.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
-        builder.vertex(matrix, this.area.ex(), this.graph.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
+        builder.vertex(matrix, this.area.x, this.graph.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
+        builder.vertex(matrix, this.area.ex(), this.graph.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
 
         /* Left and right */
-        builder.vertex(matrix, this.graph.x, this.area.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
-        builder.vertex(matrix, this.graph.x, this.area.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
+        builder.vertex(matrix, this.graph.x, this.area.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
+        builder.vertex(matrix, this.graph.x, this.area.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
 
-        builder.vertex(matrix, this.graph.ex(), this.area.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
-        builder.vertex(matrix, this.graph.ex(), this.area.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F);
+        builder.vertex(matrix, this.graph.ex(), this.area.y, 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
+        builder.vertex(matrix, this.graph.ex(), this.area.ey(), 0F).color(0.5F, 0.5F, 0.5F, 0.5F).next();
 
         if (this.curve.type == ParticleCurveType.HERMITE && c >= 4)
         {
@@ -283,11 +283,11 @@ public class UICurve extends UIElement
             Vector2d last = this.getVector(c - 2, this.range.x, this.range.y);
 
             /* Hermite bounds */
-            builder.vertex(matrix, (float) first.x, this.graph.y, 0F).color(0.25F, 0.25F, 0.25F, 0.5F);
-            builder.vertex(matrix, (float) first.x, this.graph.ey(), 0F).color(0.25F, 0.25F, 0.25F, 0.5F);
+            builder.vertex(matrix, (float) first.x, this.graph.y, 0F).color(0.25F, 0.25F, 0.25F, 0.5F).next();
+            builder.vertex(matrix, (float) first.x, this.graph.ey(), 0F).color(0.25F, 0.25F, 0.25F, 0.5F).next();
 
-            builder.vertex(matrix, (float) last.x, this.graph.y, 0F).color(0.25F, 0.25F, 0.25F, 0.5F);
-            builder.vertex(matrix, (float) last.x, this.graph.ey(), 0F).color(0.25F, 0.25F, 0.25F, 0.5F);
+            builder.vertex(matrix, (float) last.x, this.graph.y, 0F).color(0.25F, 0.25F, 0.25F, 0.5F).next();
+            builder.vertex(matrix, (float) last.x, this.graph.ey(), 0F).color(0.25F, 0.25F, 0.25F, 0.5F).next();
         }
 
         BufferRenderer.drawWithGlobalProgram(builder.end());

@@ -7,9 +7,7 @@ import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.data.types.StringType;
 import mchorse.bbs_mod.resources.Link;
-
 import com.mojang.logging.LogUtils;
-
 import org.slf4j.Logger;
 
 import java.io.File;
@@ -199,7 +197,7 @@ public class SoundLikeManager
         return sound != null ? sound.getDisplayName() : null;
     }
 
-    public List<LikedSound> getLikedSounds()
+    public java.util.List<LikedSound> getLikedSounds()
     {
         return new ArrayList<>(this.likedSounds.values());
     }

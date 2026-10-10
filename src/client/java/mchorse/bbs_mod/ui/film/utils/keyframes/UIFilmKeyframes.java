@@ -1,13 +1,10 @@
 package mchorse.bbs_mod.ui.film.utils.keyframes;
 
 import mchorse.bbs_mod.camera.utils.TimeUtils;
-import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
 import mchorse.bbs_mod.ui.film.UIClips;
 import mchorse.bbs_mod.ui.framework.UIContext;
-import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframes;
-import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIVisibleRenderKeyframeUtils;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 
 import java.util.function.Consumer;
@@ -31,11 +28,6 @@ public class UIFilmKeyframes extends UIKeyframes
         return this;
     }
 
-    public boolean isReplayWorldEditor()
-    {
-        return this.absolute;
-    }
-
     public long getClipOffset()
     {
         if (this.absolute)
@@ -48,7 +40,7 @@ public class UIFilmKeyframes extends UIKeyframes
             return 0;
         }
 
-        return Math.round(this.editor.getClip().tick.get());
+        return this.editor.getClip().tick.get();
     }
 
     public int getOffset()
@@ -59,12 +51,6 @@ public class UIFilmKeyframes extends UIKeyframes
         }
 
         return (int) (this.editor.getCursor() - this.getClipOffset());
-    }
-
-    @Override
-    protected float getPlayheadTick()
-    {
-        return this.getOffset();
     }
 
     @Override
@@ -92,17 +78,6 @@ public class UIFilmKeyframes extends UIKeyframes
     }
 
     @Override
-    public void toolbarInsertIndividual(UIKeyframeSheet sheet, float tick)
-    {
-        super.toolbarInsertIndividual(sheet, tick);
-
-        if (sheet != null && FormUtils.isVisiblePropertyPath(sheet.id))
-        {
-            UIVisibleRenderKeyframeUtils.syncRenderOnVisibleInsert(sheet.channel, tick);
-        }
-    }
-
-    @Override
     protected void renderBackground(UIContext context)
     {
         super.renderBackground(context);
@@ -110,12 +85,6 @@ public class UIFilmKeyframes extends UIKeyframes
         if (this.editor != null)
         {
             int cx = this.toGraphX(this.getOffset());
-
-            if (cx < this.area.x + this.getSidebarWidth())
-            {
-                return;
-            }
-
             String label = TimeUtils.formatTime(this.getOffset()) + "/" + TimeUtils.formatTime(this.getDuration());
 
             UIClips.renderCursor(context, label, this.area, cx - 1);

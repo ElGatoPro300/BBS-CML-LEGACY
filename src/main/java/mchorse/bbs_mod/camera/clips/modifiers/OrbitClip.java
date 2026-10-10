@@ -11,7 +11,6 @@ import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.clips.ClipContext;
 import mchorse.bbs_mod.utils.interps.Lerps;
 import mchorse.bbs_mod.utils.joml.Matrices;
-
 import org.joml.Vector3f;
 
 import java.util.List;
@@ -70,7 +69,7 @@ public class OrbitClip extends EntityClip
             return;
         }
 
-        if (!context.applyUnderneath(Math.round(this.tick.get()), 0F, this.position))
+        if (!context.applyUnderneath(this.tick.get(), 0F, this.position))
         {
             this.position.copy(position);
         }

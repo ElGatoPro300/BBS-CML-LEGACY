@@ -103,19 +103,14 @@ public class Clips extends ValueGroup
      */
     public int calculateDuration()
     {
-        double max = 0D;
+        int max = 0;
 
         for (Clip clip : this.clips)
         {
-            double end = (double) clip.tick.get() + (double) clip.duration.get();
-
-            if (end > max)
-            {
-                max = end;
-            }
+            max = Math.max(max, clip.tick.get() + clip.duration.get());
         }
 
-        return max > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.ceil(max);
+        return max;
     }
 
     public Clip get(int index)
@@ -153,20 +148,10 @@ public class Clips extends ValueGroup
 
     public List<Clip> getClips(int tick)
     {
-        return this.getClips((float) tick, Integer.MAX_VALUE);
-    }
-
-    public List<Clip> getClips(int tick, int maxLayer)
-    {
-        return this.getClips((float) tick, maxLayer);
-    }
-
-    public List<Clip> getClips(float tick)
-    {
         return this.getClips(tick, Integer.MAX_VALUE);
     }
 
-    public List<Clip> getClips(float tick, int maxLayer)
+    public List<Clip> getClips(int tick, int maxLayer)
     {
         List<Clip> clipList = new ArrayList<>();
 
@@ -186,42 +171,9 @@ public class Clips extends ValueGroup
     }
 
     /**
-     * Clips whose start (or interior for ranges) may fire between {@code prevTime} and {@code currTime}.
-     * One-shot actions use an edge at {@code clip.tick}; lasting clips that overlap the window are also returned.
-     */
-    public List<Clip> getClipsCrossing(float prevTime, float currTime)
-    {
-        List<Clip> clipList = new ArrayList<>();
-
-        if (currTime <= prevTime)
-        {
-            return clipList;
-        }
-
-        for (Clip clip : this.clips)
-        {
-            float start = clip.tick.get();
-            float end = start + clip.duration.get();
-
-            /* Edge at start, or any overlap with the open-closed window. */
-            boolean crossesStart = prevTime < start && currTime >= start;
-            boolean overlaps = currTime > start && prevTime < end;
-
-            if (crossesStart || overlaps || clip.isGlobal())
-            {
-                clipList.add(clip);
-            }
-        }
-
-        clipList.sort(Comparator.comparingInt((a) -> a.layer.get()));
-
-        return clipList;
-    }
-
-    /**
      * Get index of a given clip.
      *
-     * Returns -1 if given clip is not present in this clips property.
+     * @return index of a clip in the thing
      */
     public int getIndex(Clip clip)
     {
@@ -293,10 +245,8 @@ public class Clips extends ValueGroup
 
         for (Clip clip : this.clips)
         {
-            float leftF = clip.tick.get() - tick;
-            float rightF = leftF + clip.duration.get();
-            int left = Math.round(leftF);
-            int right = Math.round(rightF);
+            int left = clip.tick.get() - tick;
+            int right = left + clip.duration.get();
 
             int a = Math.max(left, 0);
             int b = Math.max(right, 0);
@@ -320,10 +270,8 @@ public class Clips extends ValueGroup
 
         for (Clip clip : this.clips)
         {
-            float leftF = clip.tick.get() - tick;
-            float rightF = leftF + clip.duration.get();
-            int left = Math.round(leftF);
-            int right = Math.round(rightF);
+            int left = clip.tick.get() - tick;
+            int right = left + clip.duration.get();
 
             int a = Math.min(left, -0);
             int b = Math.min(right, -0);
@@ -345,7 +293,7 @@ public class Clips extends ValueGroup
     {
         for (Clip clip : this.clips)
         {
-            clip.tick.set(clip.tick.get() + tick);
+            clip.tick.set(Math.round(clip.tick.get() + tick));
         }
     }
 

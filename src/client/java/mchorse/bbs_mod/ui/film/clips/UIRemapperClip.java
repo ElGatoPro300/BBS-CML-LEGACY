@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.ui.film.clips;
 
 import mchorse.bbs_mod.camera.clips.modifiers.RemapperClip;
+import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
@@ -8,6 +9,7 @@ import mchorse.bbs_mod.ui.film.replays.UIReplaysEditor;
 import mchorse.bbs_mod.ui.film.utils.keyframes.UIFilmKeyframes;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
+import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.utils.clips.Clips;
 import mchorse.bbs_mod.utils.colors.Colors;
 
@@ -29,7 +31,7 @@ public class UIRemapperClip extends UIClip<RemapperClip>
         this.keyframes = new UIKeyframeEditor((consumer) -> new UIFilmKeyframes(this.editor, consumer));
         this.keyframes.view.backgroundRenderer((context) ->
         {
-            UIReplaysEditor.renderBackground(context, this.keyframes.view, (Clips) this.clip.getParent(), Math.round(this.clip.tick.get()), this.clip);
+            UIReplaysEditor.renderBackground(context, this.keyframes.view, (Clips) this.clip.getParent(), this.clip.tick.get());
         });
         this.keyframes.view.single().duration(() -> this.clip.duration.get());
         this.keyframes.setUndoId("remapper_keyframes");
@@ -50,7 +52,7 @@ public class UIRemapperClip extends UIClip<RemapperClip>
     {
         super.registerPanels();
 
-        this.panels.add(this.section(UIKeys.C_CLIP.get("bbs:remapper"), this.edit));
+        this.panels.add(UI.column(UIClip.label(UIKeys.C_CLIP.get("bbs:remapper")), this.edit).marginTop(12));
     }
 
     @Override
@@ -62,8 +64,26 @@ public class UIRemapperClip extends UIClip<RemapperClip>
     }
 
     @Override
-    protected UIKeyframeEditor resolveClipEmbeddableView(String undoId)
+    public void applyUndoData(MapType data)
     {
-        return undoId.equals(this.keyframes.getUndoId()) ? this.keyframes : null;
+        super.applyUndoData(data);
+
+        if (data.getString("embed").equals("remapper"))
+        {
+            this.editor.embedView(this.keyframes);
+            this.keyframes.view.editSheet(this.keyframes.view.getGraph().getSheets().get(0));
+            this.keyframes.view.resetView();
+        }
+    }
+
+    @Override
+    public void collectUndoData(MapType data)
+    {
+        super.collectUndoData(data);
+
+        if (this.keyframes.hasParent())
+        {
+            data.putString("embed", "remapper");
+        }
     }
 }

@@ -4,11 +4,8 @@ import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.controller.ICameraController;
 import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.BBSRendering;
-
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.hud.InGameHud;
-import net.minecraft.client.render.RenderTickCounter;
-
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class InGameHudMixin
 {
     @Inject(method = "render", at = @At(value = "HEAD"), cancellable = true)
-    public void render(DrawContext drawContext, RenderTickCounter tickCounter, CallbackInfo info)
+    public void render(DrawContext drawContext, float tickDelta, CallbackInfo info)
     {
         ICameraController current = BBSModClient.getCameraController().getCurrent();
 
@@ -27,17 +24,11 @@ public class InGameHudMixin
             BBSRendering.onRenderBeforeScreen();
 
             info.cancel();
-
-            return;
         }
-
-        /* World forms / model-block items can leave shaderColor or lightmap dirty (worse after
-         * pause present). Reset before widgets.png hotbar and GUI item forms. */
-        BBSRendering.prepareHudRenderState();
     }
 
     @Inject(method = "render", at = @At("TAIL"))
-    public void onRenderEnd(DrawContext drawContext, RenderTickCounter tickCounter, CallbackInfo info)
+    public void onRenderEnd(CallbackInfo info)
     {
         BBSRendering.onRenderBeforeScreen();
     }
