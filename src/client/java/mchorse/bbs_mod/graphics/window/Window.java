@@ -13,7 +13,6 @@ import net.minecraft.client.MouseHandler;
 import com.mojang.blaze3d.platform.InputConstants;
 
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -33,19 +32,7 @@ public class Window
     private static long clipboardCacheMs;
     private static final long CLIPBOARD_CACHE_MS = 500L;
 
-    /**
-     * Suppress GLFW_FORMAT_UNAVAILABLE (65545) during clipboard
-     * reads so Windows non-text / locked clipboard does not spam "GL ERROR" via Minecraft's
-     * GLFW error callback. Other GLFW errors still print to stderr.
-     */
-    private static final GLFWErrorCallback clipboardErrorPrint = GLFWErrorCallback.createPrint(System.err);
-    private static final GLFWErrorCallback clipboardErrorCallback = GLFWErrorCallback.create((error, description) ->
-    {
-        if (error != GLFW.GLFW_FORMAT_UNAVAILABLE)
-        {
-            clipboardErrorPrint.invoke(error, description);
-        }
-    });
+
 
     public static long getWindow()
     {
@@ -90,7 +77,7 @@ public class Window
 
     public static boolean isKeyPressed(int key)
     {
-        return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);
+        return InputConstants.isKeyDown(key);
     }
 
     public static String getClipboard()
@@ -103,9 +90,6 @@ public class Window
             return clipboardCache;
         }
 
-        /* Install a local GLFW error filter for this read only. */
-        GLFWErrorCallback previous = GLFW.glfwSetErrorCallback(clipboardErrorCallback);
-
         try
         {
             String string = GLFW.glfwGetClipboardString(getWindow());
@@ -115,10 +99,6 @@ public class Window
         catch (Exception e)
         {
             clipboardCache = "";
-        }
-        finally
-        {
-            GLFW.glfwSetErrorCallback(previous);
         }
 
         clipboardCacheMs = now;

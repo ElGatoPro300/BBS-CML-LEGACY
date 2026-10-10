@@ -8,7 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
 
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
+
 
 import java.awt.FileDialog;
 import java.awt.Frame;
@@ -104,16 +104,61 @@ public class UIUtils
             }
         }
 
+        ensureAwt();
+
         try
         {
-            return TinyFileDialogs.tinyfd_selectFolderDialog(title, defaultPath == null ? "" : defaultPath);
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (Throwable ignored)
+        {}
+
+        Frame owner = null;
+
+        try
+        {
+            owner = new Frame();
+            owner.setAlwaysOnTop(true);
+            owner.setLocationRelativeTo(null);
+            owner.setVisible(true);
+
+            JFileChooser chooser = new JFileChooser();
+
+            chooser.setDialogTitle(title == null ? "Select Folder" : title);
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            chooser.setMultiSelectionEnabled(false);
+            chooser.setAcceptAllFileFilterUsed(false);
+
+            if (defaultPath != null && !defaultPath.isEmpty())
+            {
+                File dir = new File(defaultPath);
+
+                if (dir.exists())
+                {
+                    chooser.setCurrentDirectory(dir.isDirectory() ? dir : dir.getParentFile());
+                }
+            }
+
+            int result = chooser.showOpenDialog(owner);
+
+            if (result == JFileChooser.APPROVE_OPTION && chooser.getSelectedFile() != null)
+            {
+                return chooser.getSelectedFile().getAbsolutePath();
+            }
         }
         catch (Throwable t)
         {
             t.printStackTrace();
-
-            return null;
         }
+        finally
+        {
+            if (owner != null)
+            {
+                owner.dispose();
+            }
+        }
+
+        return null;
     }
 
     public static boolean openFolder(File folder)

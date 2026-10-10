@@ -39,19 +39,19 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
-import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.opengl.GlProgram;
-import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.mojang.renderpearl.backend.opengl.GlProgram;
+import com.mojang.renderpearl.backend.opengl.GlStateManager;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -147,7 +147,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             {
                 this.applyTransforms(uiMatrix, context.getTransition());
                 MatrixStackUtils.multiply(stack, uiMatrix);
-                stack.mulPose(Axis.YN.rotationDegrees(180F));
+                stack.rotate(Axis.YN.rotationDegrees(180F));
                 stack.last().normal().getScale(Vectors.EMPTY_3F);
                 stack.last().normal().scale(1F / Vectors.EMPTY_3F.x, -1F / Vectors.EMPTY_3F.y, 1F / Vectors.EMPTY_3F.z);
 
@@ -323,13 +323,13 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         RenderSystem.getModelViewStack().identity();
         MatrixStackUtils.applyModelViewMatrix();
 
-        GpuTextureView previousColorView = RenderSystem.outputColorTextureOverride;
-        GpuTextureView previousDepthView = RenderSystem.outputDepthTextureOverride;
+        GpuTextureView previousColorView = BBSRendering.outputColorTextureOverride;
+        GpuTextureView previousDepthView = BBSRendering.outputDepthTextureOverride;
         Texture mainTexture = framebuffer.getMainTexture();
         GpuTextureView fboColorView = AdoptedTexture.textureView(mainTexture.id, mainTexture.width, mainTexture.height);
 
-        RenderSystem.outputColorTextureOverride = fboColorView;
-        RenderSystem.outputDepthTextureOverride = null;
+        BBSRendering.outputColorTextureOverride = fboColorView;
+        BBSRendering.outputDepthTextureOverride = null;
 
         framebuffer.apply();
 
@@ -412,8 +412,8 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         }
         finally
         {
-            RenderSystem.outputColorTextureOverride = previousColorView;
-            RenderSystem.outputDepthTextureOverride = previousDepthView;
+            BBSRendering.outputColorTextureOverride = previousColorView;
+            BBSRendering.outputDepthTextureOverride = previousDepthView;
             GL11.glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
             context.light = savedLight;
             /* ModelForm leaves lightmap off inside offscreen; re-arm before the blit. */

@@ -66,7 +66,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import org.joml.Vector4f;
 
-import com.mojang.blaze3d.opengl.GlProgram;
+import com.mojang.renderpearl.backend.opengl.GlProgram;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.QuadInstance;
@@ -1680,7 +1680,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
             if (storage != null)
             {
-                renderDispatcher.renderAllFeatures(storage);
+                BBSRendering.renderFeatures(renderDispatcher, storage);
             }
         }
         finally

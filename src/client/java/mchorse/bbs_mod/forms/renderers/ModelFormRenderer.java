@@ -84,10 +84,10 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.mojang.renderpearl.backend.opengl.GlProgram;
 
 import org.lwjgl.opengl.GL11;
 
@@ -3290,7 +3290,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             stack.pushPose();
             MatrixStackUtils.multiply(stack, matrix);
             MatrixStackUtils.applyTransform(stack, armorSlot.transform);
-            stack.mulPose(Axis.XP.rotationDegrees(180F));
+            stack.rotate(Axis.XP.rotationDegrees(180F));
 
             CustomVertexConsumerProvider.hijackVertexFormat((l) -> BBSRendering.enableBlend());
 
@@ -3336,8 +3336,8 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
                 stack.pushPose();
                 MatrixStackUtils.multiply(stack, matrix);
-                stack.mulPose(Axis.XP.rotationDegrees(90F));
-                stack.mulPose(Axis.YP.rotationDegrees(180F));
+                stack.rotate(Axis.XP.rotationDegrees(90F));
+                stack.rotate(Axis.YP.rotationDegrees(180F));
                 stack.translate(0F, 0.125F, 0F);
 
                 if (globalTransform != null)
@@ -3588,7 +3588,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             model.model.resetPose();
 
             matrices.pushPose();
-            matrices.mulPose(Axis.YP.rotation(MathUtils.PI));
+            matrices.rotate(Axis.YP.rotation(MathUtils.PI));
             MatrixStackUtils.applyTransform(matrices, slot.transform);
 
             this.applyPBRTextureIntensity();
@@ -3656,10 +3656,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             this.animator.applyActions(context.entity, model, context.getTransition());
             model.model.applyPose(this.getPose());
 
-            context.stack.mulPose(Axis.YP.rotation(MathUtils.PI));
+            context.stack.rotate(Axis.YP.rotation(MathUtils.PI));
             if (context.world != null)
             {
-                context.world.mulPose(Axis.YP.rotation(MathUtils.PI));
+                context.world.rotate(Axis.YP.rotation(MathUtils.PI));
             }
 
             if (texture != null)
@@ -3806,12 +3806,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                         }
                         else
                         {
-                            partStack.mulPose(Axis.YP.rotation(MathUtils.PI));
+                            partStack.rotate(Axis.YP.rotation(MathUtils.PI));
                         }
 
                         MatrixStackUtils.applyTransform(partStack, part.transform.get());
                         partModelRenderer.applyTransforms(partStack, false, transition);
-                        partStack.mulPose(Axis.YP.rotation(MathUtils.PI));
+                        partStack.rotate(Axis.YP.rotation(MathUtils.PI));
 
                         Matrix4f rel = new Matrix4f(partStack.last().pose());
                         Link link = partModelForm.texture.get();
@@ -3923,10 +3923,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             }
             else
             {
-                context.stack.mulPose(Axis.YP.rotation(MathUtils.PI));
+                context.stack.rotate(Axis.YP.rotation(MathUtils.PI));
                 if (context.world != null)
                 {
-                    context.world.mulPose(Axis.YP.rotation(MathUtils.PI));
+                    context.world.rotate(Axis.YP.rotation(MathUtils.PI));
                 }
             }
 
@@ -3968,7 +3968,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             this.animator.applyActions(entity, model, transition);
             model.model.applyPose(this.getPose());
 
-            stack.mulPose(Axis.YP.rotation(MathUtils.PI));
+            stack.rotate(Axis.YP.rotation(MathUtils.PI));
             this.captureMatrices(model);
         }
 
@@ -4009,7 +4009,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                 }
                 else
                 {
-                    stack.mulPose(Axis.YP.rotation(MathUtils.PI));
+                    stack.rotate(Axis.YP.rotation(MathUtils.PI));
                 }
 
                 MatrixStackUtils.applyTransform(stack, part.transform.get());

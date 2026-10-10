@@ -93,7 +93,7 @@ public final class ItemRenderHelper
         {
             ensureIsolatedDispatcher();
             STATE.submit(matrices, isolatedQueue, light, overlay, 0);
-            isolatedDispatcher.renderAllFeatures(isolatedQueue);
+            BBSRendering.renderFeatures(isolatedDispatcher, isolatedQueue);
             FormUtilsClient.getProvider().draw();
         }
         else

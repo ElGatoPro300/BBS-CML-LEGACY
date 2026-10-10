@@ -47,7 +47,7 @@ public final class BbsHeadItemSpace
      */
     private static void alignBoneToModelPart(PoseStack stack)
     {
-        stack.mulPose(Axis.XP.rotationDegrees(180F));
+        stack.rotate(Axis.XP.rotationDegrees(180F));
     }
 
     /**
@@ -60,7 +60,7 @@ public final class BbsHeadItemSpace
 
         /* Vanilla HeadFeatureRenderer / CustomHeadLayer translate */
         stack.translate(0F, -0.25F, 0F);
-        stack.mulPose(Axis.YP.rotationDegrees(180F));
+        stack.rotate(Axis.YP.rotationDegrees(180F));
         stack.scale(HAT_SCALE, -HAT_SCALE, -HAT_SCALE);
     }
 
@@ -92,7 +92,7 @@ public final class BbsHeadItemSpace
         float clamped = clampSpyglassLookPitch(lookPitchDeg);
 
         /* captureMatrices attachment space: M_want = M * Rx(clamped − actual). */
-        stack.mulPose(Axis.XP.rotationDegrees(clamped - lookPitchDeg));
+        stack.rotate(Axis.XP.rotationDegrees(clamped - lookPitchDeg));
 
         /* Neck → eye. Do not use HeadFeatureRenderer's T(0,−0.25) / applyHeadItem here. */
         stack.translate(0F, EYE_Y, 0F);
@@ -104,7 +104,7 @@ public final class BbsHeadItemSpace
         stack.translate(leftArm ? ARM_BIAS : -ARM_BIAS, HAT_Y, 0F);
 
         /* Cancel extra 180° barrel/texture roll without moving the eyepiece. */
-        stack.mulPose(Axis.ZP.rotationDegrees(180F));
+        stack.rotate(Axis.ZP.rotationDegrees(180F));
     }
 
     /**

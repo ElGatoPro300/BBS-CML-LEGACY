@@ -14,10 +14,10 @@ import net.minecraft.client.Minecraft;
 
 import org.joml.Matrix4f;
 
-import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import mchorse.bbs_mod.client.renderer.Tesselator;
 
 import org.lwjgl.opengl.GL11;
