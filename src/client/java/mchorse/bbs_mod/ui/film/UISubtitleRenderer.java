@@ -209,6 +209,16 @@ public class UISubtitleRenderer
         }
     }
 
+    public static void renderSubtitle(PoseStack stack, Batcher2D batcher, Subtitle subtitle, int frameW, int frameH)
+    {
+        renderSubtitle(batcher, subtitle, frameW, frameH);
+    }
+
+    public static void renderSubtitles(PoseStack stack, Batcher2D batcher, List<Subtitle> subtitles, int frameW, int frameH)
+    {
+        renderSubtitles(batcher, subtitles, frameW, frameH);
+    }
+
     public static void renderSubtitles(PoseStack stack, Batcher2D batcher, List<Subtitle> subtitles)
     {
         Minecraft client = Minecraft.getInstance();

@@ -155,9 +155,11 @@ public class BOBJModel implements IModel
                 continue;
             }
 
+            /* Fix blends the animator layer toward rest (same as cubic Model / collision BOBJ).
+             * Pose T/R/S/P still apply on poseTransform below. */
             if (transform.fix > 0F)
             {
-                bone.poseTransform.lerp(Transform.DEFAULT, transform.fix);
+                bone.transform.lerp(Transform.DEFAULT, transform.fix);
             }
 
             bone.lighting = transform.lighting;

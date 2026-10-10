@@ -12,7 +12,6 @@ import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.compat.HdrModCompat;
 import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
 import mchorse.bbs_mod.client.screen.ScreenEffectRenderer;
-import mchorse.bbs_mod.client.video.VideoRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.events.TriggerBlockEntityUpdateCallback;
@@ -34,6 +33,7 @@ import mchorse.bbs_mod.forms.renderers.utils.ModelEffectPass;
 import mchorse.bbs_mod.forms.renderers.utils.RecolorVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.TextGlowEmissionVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.TextGlowEmissionVertexSodiumConsumer;
+import mchorse.bbs_mod.client.video.VideoRenderer;
 import mchorse.bbs_mod.graphics.WorldOverlayRenderer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.graphics.texture.TextureFormat;
@@ -250,16 +250,22 @@ public class BBSRendering
     public static File getVideoFolder()
     {
         File movies = new File(BBSMod.getSettingsFolder().getParentFile(), "movies");
-        File exportPath = new File(BBSSettings.videoSettings.path.get());
+        String configured = BBSSettings.videoSettings.path.get();
 
-        if (exportPath.isDirectory())
+        /* Java 25 treats new File("").isDirectory() as true (cwd). Skip blank paths. */
+        if (configured != null && !configured.trim().isEmpty())
         {
-            movies = exportPath;
+            File exportPath = new File(configured.trim());
+
+            if (exportPath.isDirectory())
+            {
+                movies = exportPath;
+            }
         }
 
         movies.mkdirs();
 
-        return movies;
+        return movies.getAbsoluteFile();
     }
 
     public static boolean canReplaceFramebuffer()
