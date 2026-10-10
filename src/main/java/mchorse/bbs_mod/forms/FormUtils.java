@@ -6,6 +6,7 @@ import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.Form;
+import mchorse.bbs_mod.forms.forms.FramebufferForm;
 import mchorse.bbs_mod.forms.states.AnimationState;
 import mchorse.bbs_mod.settings.values.base.BaseValue;
 import mchorse.bbs_mod.settings.values.base.BaseValueBasic;
@@ -14,6 +15,7 @@ import mchorse.bbs_mod.utils.StringUtils;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -75,6 +77,11 @@ public class FormUtils
 
     public static Form getForm(BaseValue property)
     {
+        if (property == null)
+        {
+            return null;
+        }
+
         if (property.getParent() instanceof Form form)
         {
             return form;
@@ -114,6 +121,11 @@ public class FormUtils
 
     public static String getPath(Form form)
     {
+        if (form == null)
+        {
+            return "";
+        }
+
         if (form.getParent() == null)
         {
             return "";
@@ -184,6 +196,77 @@ public class FormUtils
         return String.join(PATH_SEPARATOR, path);
     }
 
+    public static String propertyName(String path)
+    {
+        if (path == null || path.isEmpty())
+        {
+            return "";
+        }
+
+        int slash = path.lastIndexOf(PATH_SEPARATOR);
+
+        return slash == -1 ? path : path.substring(slash + 1);
+    }
+
+    public static boolean isVisiblePropertyPath(String path)
+    {
+        return "visible".equals(propertyName(path));
+    }
+
+    public static boolean isRenderPropertyPath(String path)
+    {
+        return "render".equals(propertyName(path));
+    }
+
+    public static String getRenderPropertyPath(String visiblePath)
+    {
+        if (visiblePath == null || visiblePath.isEmpty())
+        {
+            return "render";
+        }
+
+        int slash = visiblePath.lastIndexOf(PATH_SEPARATOR);
+
+        if (slash == -1)
+        {
+            return "render";
+        }
+
+        return visiblePath.substring(0, slash + 1) + "render";
+    }
+
+    public static String getVisiblePropertyPath(String renderPath)
+    {
+        if (renderPath == null || renderPath.isEmpty())
+        {
+            return "visible";
+        }
+
+        int slash = renderPath.lastIndexOf(PATH_SEPARATOR);
+
+        if (slash == -1)
+        {
+            return "visible";
+        }
+
+        return renderPath.substring(0, slash + 1) + "visible";
+    }
+
+    public static void addPairedRenderPropertyPaths(Iterable<String> propertyPaths, Collection<String> target)
+    {
+        List<String> paired = new ArrayList<>();
+
+        for (String key : propertyPaths)
+        {
+            if (isVisiblePropertyPath(key))
+            {
+                paired.add(getRenderPropertyPath(key));
+            }
+        }
+
+        target.addAll(paired);
+    }
+
     public static List<String> collectPropertyPaths(Form form)
     {
         List<String> properties = new ArrayList<>();
@@ -217,6 +300,13 @@ public class FormUtils
             {
                 properties.add(StringUtils.combinePaths(prefix, property.getId()));
             }
+        }
+
+        /* Synthetic compound tracks — form keeps separate Value fields for the editor panel. */
+        if (form instanceof FramebufferForm)
+        {
+            properties.add(StringUtils.combinePaths(prefix, "resolution"));
+            properties.add(StringUtils.combinePaths(prefix, "view_extent"));
         }
 
         List<BodyPart> all = form.parts.getAllTyped();

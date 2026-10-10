@@ -1,8 +1,10 @@
 package mchorse.bbs_mod.graphics.texture;
 
+import mchorse.bbs_mod.utils.resources.Pixels;
+
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.platform.TextureUtil;
-import mchorse.bbs_mod.utils.resources.Pixels;
+
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
@@ -106,11 +108,21 @@ public class Texture
 
     public void bind()
     {
+        if (this.id <= 0)
+        {
+            return;
+        }
+
         GL11.glBindTexture(this.target, this.id);
     }
 
     public void bind(int texture)
     {
+        if (this.id <= 0)
+        {
+            return;
+        }
+
         GlStateManager.glActiveTexture(texture);
         GL11.glBindTexture(this.target, this.id);
     }
@@ -230,11 +242,23 @@ public class Texture
 
     public void uploadTexture(int target, int level, int w, int h, ByteBuffer buffer)
     {
-        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, w);
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+        try
+        {
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, w);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
 
-        GL11.glTexImage2D(target, level, this.format.internal, w, h, 0, this.format.format, this.format.type, buffer);
+            GL11.glTexImage2D(target, level, this.format.internal, w, h, 0, this.format.format, this.format.type, buffer);
+        }
+        finally
+        {
+            /* Leaving ROW_LENGTH = w blacks out the block atlas / GUI icons (same class of
+             * leak as VideoForm ffmpeg uploads — see VideoFormEngine). */
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
+        }
 
         if (level == 0)
         {

@@ -1,6 +1,10 @@
 package mchorse.bbs_mod.ui.forms.editors;
 
+import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.BBSSettings;
+import mchorse.bbs_mod.cubic.ModelInstance;
+import mchorse.bbs_mod.data.types.BaseType;
+import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.forms.AnchorForm;
@@ -9,20 +13,36 @@ import mchorse.bbs_mod.forms.forms.BlockForm;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.BodyPartManager;
 import mchorse.bbs_mod.forms.forms.ExtrudedForm;
+import mchorse.bbs_mod.forms.forms.FluidForm;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.FramebufferForm;
 import mchorse.bbs_mod.forms.forms.ItemForm;
 import mchorse.bbs_mod.forms.forms.LabelForm;
+import mchorse.bbs_mod.forms.forms.LightForm;
 import mchorse.bbs_mod.forms.forms.MobForm;
 import mchorse.bbs_mod.forms.forms.ModelForm;
 import mchorse.bbs_mod.forms.forms.ParticleForm;
+import mchorse.bbs_mod.forms.forms.ShapeForm;
+import mchorse.bbs_mod.forms.forms.StructureForm;
 import mchorse.bbs_mod.forms.forms.TrailForm;
 import mchorse.bbs_mod.forms.forms.VanillaParticleForm;
+import mchorse.bbs_mod.forms.forms.VideoForm;
+import mchorse.bbs_mod.forms.renderers.ModelFormRenderer;
 import mchorse.bbs_mod.forms.states.AnimationState;
+import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.graphics.window.Window;
+import mchorse.bbs_mod.l10n.keys.IKey;
+import mchorse.bbs_mod.resources.Link;
+import mchorse.bbs_mod.settings.values.base.BaseValue;
+import mchorse.bbs_mod.settings.values.ui.ValueFormEditorGizmoToolbar;
+import mchorse.bbs_mod.ui.ContentType;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
+import mchorse.bbs_mod.ui.dashboard.UIDashboard;
 import mchorse.bbs_mod.ui.film.ICursor;
+import mchorse.bbs_mod.ui.film.controller.UIGizmoSizeContextMenu;
+import mchorse.bbs_mod.ui.film.controller.UIGizmoThicknessContextMenu;
+import mchorse.bbs_mod.ui.film.controller.UIGizmoTranslateSpeedContextMenu;
 import mchorse.bbs_mod.ui.film.replays.UIReplaysEditorUtils;
 import mchorse.bbs_mod.ui.forms.IUIFormList;
 import mchorse.bbs_mod.ui.forms.UIFormList;
@@ -31,31 +51,45 @@ import mchorse.bbs_mod.ui.forms.editors.forms.UIAnchorForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIBillboardForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIBlockForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIExtrudedForm;
+import mchorse.bbs_mod.ui.forms.editors.forms.UIFluidForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIFramebufferForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIItemForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UILabelForm;
+import mchorse.bbs_mod.ui.forms.editors.forms.UILightForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIMobForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIModelForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIParticleForm;
+import mchorse.bbs_mod.ui.forms.editors.forms.UIShapeForm;
+import mchorse.bbs_mod.ui.forms.editors.forms.UIStructureForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UITrailForm;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIVanillaParticleForm;
+import mchorse.bbs_mod.ui.forms.editors.forms.UIVideoForm;
+import mchorse.bbs_mod.ui.forms.editors.panels.UIFormPanel;
 import mchorse.bbs_mod.ui.forms.editors.states.UIAnimationStatesOverlayPanel;
 import mchorse.bbs_mod.ui.forms.editors.states.keyframes.UIAnimationStateEditor;
 import mchorse.bbs_mod.ui.forms.editors.utils.UIPickableFormRenderer;
+import mchorse.bbs_mod.ui.forms.editors.utils.UISetupFaceOverlayPanel;
 import mchorse.bbs_mod.ui.framework.UIContext;
+import mchorse.bbs_mod.ui.framework.UIScreen;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIIcon;
+import mchorse.bbs_mod.ui.framework.elements.input.UIPropTransform;
 import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlay;
 import mchorse.bbs_mod.ui.framework.elements.utils.EventPropagation;
 import mchorse.bbs_mod.ui.framework.elements.utils.UIDraggable;
+import mchorse.bbs_mod.ui.framework.elements.utils.UILabel;
 import mchorse.bbs_mod.ui.framework.elements.utils.UIRenderable;
 import mchorse.bbs_mod.ui.utils.Gizmo;
 import mchorse.bbs_mod.ui.utils.StencilFormFramebuffer;
 import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.UIUtils;
 import mchorse.bbs_mod.ui.utils.context.ContextMenuManager;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoMatrixUtils;
+import mchorse.bbs_mod.ui.utils.gizmo.TransformOrientation;
+import mchorse.bbs_mod.ui.utils.icons.Icon;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
+import mchorse.bbs_mod.ui.utils.pose.UIPoseEditor;
 import mchorse.bbs_mod.ui.utils.presets.UICopyPasteController;
 import mchorse.bbs_mod.ui.utils.presets.UIPresetContextMenu;
 import mchorse.bbs_mod.utils.CollectionUtils;
@@ -63,20 +97,35 @@ import mchorse.bbs_mod.utils.Direction;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.Pair;
 import mchorse.bbs_mod.utils.colors.Colors;
+import mchorse.bbs_mod.utils.joml.Matrices;
+import mchorse.bbs_mod.utils.pose.Transform;
 import mchorse.bbs_mod.utils.presets.PresetManager;
-import org.joml.Matrix4f;
+import mchorse.bbs_mod.utils.resources.FilteredLink;
+import mchorse.bbs_mod.utils.resources.MultiLink;
 
+import org.joml.Matrix4f;
+import org.joml.Vector4f;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 {
-    private static Map<Class, Supplier<UIForm>> panels = new HashMap<>();
+    public enum InspectorMode
+    {
+        FORM, BODY_PART, KEYFRAME
+    }
 
-    private static float treeWidth = 0F;
+    public static Map<Class, Supplier<UIForm>> panels = new HashMap<>();
+    public static Function<UIFormEditor, UIPickableFormRenderer> rendererFactory = UIPickableFormRenderer::new;
+
+    private static float treeWidth = 0.22F;
+    private static float inspectorWidth = 0.22F;
     private static boolean TOGGLED = true;
 
     /* Palette for picking a form for body parts */
@@ -94,7 +143,26 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     public UIIcon plause;
     public UIIcon shiftDuration;
 
-    /* Forms sidebar */
+    /* Model settings editor */
+    public UIFormModelEditor modelSettingsEditor;
+
+    /* Right Sidebar (Blender-style Outliner + Inspector) */
+    public UIElement rightSidebar;
+    public UIElement outliner;
+    public UIElement outlinerHeader;
+    public UIDraggable outlinerSplitter;
+    public float outlinerSplitRatio = 0.5F;
+    public UIIcon formModeBtn;
+    public UIIcon keyframeModeBtn;
+    public UIIcon copyBodyPartBtn;
+    public UIIcon pasteBodyPartBtn;
+    public UIIcon removeBodyPartBtn;
+    public UIElement inspectorModeSwitch;
+    public UIElement keyframeEditorContainer;
+    private UILabel keyframePlaceholder;
+    private InspectorMode inspectorMode = InspectorMode.FORM;
+
+    /* Forms sidebar compatibility reference */
     public UIElement forms;
     public UIForms formsList;
     public UIBodyPartEditor bodyPartEditor;
@@ -104,6 +172,29 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     public UIIcon finish;
     public UIIcon toggleSidebar;
     public UIIcon openStateEditor;
+    public UIIcon openModelEditor;
+
+    /* Gizmo mode toolbar (mirrors the film viewport's transform-mode buttons, plus a cycling
+     * target: pose bone / body-part transform / form transform). */
+    public UIElement gizmoToolbar;
+    public UIIcon gizmoTargetBtn;
+    public UIIcon gizmoMove;
+    public UIIcon gizmoScale;
+    public UIIcon gizmoRotate;
+    public UIIcon gizmoCombined;
+    public UIIcon gizmoTop;
+    public UIIcon gizmoVisualSize;
+    public UIIcon gizmoThickness;
+    public UIIcon gizmoTranslateSpeed;
+
+    private final Map<String, UIIcon> gizmoButtonMap = new HashMap<>();
+
+    public enum GizmoTarget
+    {
+        POSE, FORM
+    }
+
+    private GizmoTarget gizmoTarget = GizmoTarget.POSE;
 
     public Form form;
 
@@ -118,6 +209,8 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     static
     {
         register(BillboardForm.class, UIBillboardForm::new);
+        register(VideoForm.class, UIVideoForm::new);
+        register(FluidForm.class, UIFluidForm::new);
         register(ExtrudedForm.class, UIExtrudedForm::new);
         register(LabelForm.class, UILabelForm::new);
         register(ModelForm.class, UIModelForm::new);
@@ -128,6 +221,9 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         register(MobForm.class, UIMobForm::new);
         register(VanillaParticleForm.class, UIVanillaParticleForm::new);
         register(TrailForm.class, UITrailForm::new);
+        register(StructureForm.class, UIStructureForm::new);
+        register(ShapeForm.class, UIShapeForm::new);
+        register(LightForm.class, UILightForm::new);
         register(FramebufferForm.class, UIFramebufferForm::new);
     }
 
@@ -152,15 +248,33 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     {
         this.palette = palette;
 
+        if (BBSSettings.uiLayoutPreferences != null)
+        {
+            float savedWidth = BBSSettings.uiLayoutPreferences.getFormTreeWidth();
+
+            if (savedWidth > 0F)
+            {
+                treeWidth = savedWidth;
+            }
+
+            this.outlinerSplitRatio = BBSSettings.uiLayoutPreferences.getFormOutlinerSplit(0.5F);
+        }
+
         this.undoHandler = new UIFormUndoHandler(this);
         this.copyPasteController = new UICopyPasteController(PresetManager.BODY_PARTS, "_FormEditorBodyPart")
             .supplier(this::copyBodyPart)
             .consumer(this::pasteBodyPart)
             .canCopy(() ->
             {
-                UIForms.FormEntry current = this.formsList.getCurrentFirst();
+                for (UIForms.FormEntry entry : this.formsList.getCurrent())
+                {
+                    if (entry.part != null)
+                    {
+                        return true;
+                    }
+                }
 
-                return current != null && current.part != null;
+                return false;
             })
             .canPaste(() ->
             {
@@ -169,23 +283,180 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
                 return current != null && current.getForm() != null;
             });
 
+        /* Left column: form tree (top) + body-part (bottom, only when a part is selected). */
         this.forms = new UIElement();
-        this.forms.relative(this).x(20).w(treeWidth).minW(140).h(1F);
+        this.forms.relative(this).x(0).w(treeWidth).minW(160).h(1F);
 
-        this.formsList = new UIForms((l) -> this.pickForm(l.get(0)));
-        this.formsList.relative(this.forms).w(1F).h(0.5F);
+        this.outliner = new UIElement();
+        this.outliner.relative(this.forms).w(1F).h(1F);
+
+        UIIcon addPart = new UIIcon(Icons.ADD, (b) ->
+        {
+            UIForms.FormEntry current = this.formsList.getCurrentFirst();
+
+            if (current != null && current.getForm() != null)
+            {
+                this.addBodyPart(new BodyPart(""));
+            }
+        });
+        addPart.tooltip(UIKeys.FORMS_EDITOR_CONTEXT_ADD, Direction.RIGHT);
+
+        this.formModeBtn = new UIIcon(Icons.PROPERTIES, (b) -> this.setInspectorMode(InspectorMode.FORM));
+        this.formModeBtn.tooltip(UIKeys.FORMS_EDITOR_FORM, Direction.RIGHT);
+        this.formModeBtn.activeBackground(Colors.A50 | Colors.BLUE);
+        this.formModeBtn.active(true);
+
+        this.copyBodyPartBtn = new UIIcon(Icons.COPY, (b) ->
+        {
+            if (this.copyPasteController.copy())
+            {
+                this.updateBodyPartListButtons();
+                UIUtils.playClick();
+            }
+        });
+        this.copyBodyPartBtn.tooltip(UIKeys.FORMS_EDITOR_CONTEXT_COPY, Direction.RIGHT);
+
+        this.pasteBodyPartBtn = new UIIcon(Icons.PASTE, (b) ->
+        {
+            if (this.copyPasteController.paste(0, 0))
+            {
+                this.updateBodyPartListButtons();
+                UIUtils.playClick();
+            }
+        });
+        this.pasteBodyPartBtn.tooltip(UIKeys.FORMS_EDITOR_CONTEXT_PASTE, Direction.RIGHT);
+
+        this.removeBodyPartBtn = new UIIcon(Icons.REMOVE, (b) ->
+        {
+            if (this.hasSelectedBodyParts())
+            {
+                this.removeBodyPart();
+                this.updateBodyPartListButtons();
+                UIUtils.playClick();
+            }
+        });
+        this.removeBodyPartBtn.tooltip(UIKeys.FORMS_EDITOR_CONTEXT_REMOVE, Direction.RIGHT);
+
+        this.keyframeModeBtn = new UIIcon(Icons.GRAPH, (b) -> this.setInspectorMode(InspectorMode.KEYFRAME));
+        this.keyframeModeBtn.tooltip(UIKeys.FORMS_EDITOR_KEYFRAMES, Direction.RIGHT);
+        this.keyframeModeBtn.activeBackground(Colors.A50 | Colors.BLUE);
+        this.keyframeModeBtn.setVisible(false);
+
+        this.outlinerHeader = new UIElement()
+        {
+            @Override
+            public void render(UIContext context)
+            {
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xFF1E1F23);
+                context.batcher.box(this.area.x, this.area.ey() - 1, this.area.ex(), this.area.ey(), 0xFF2A2B2F);
+                super.render(context);
+            }
+        };
+        this.outlinerHeader.relative(this.outliner).w(1F).h(20);
+
+        /* Left: tree actions (add / copy / paste / remove body parts). Right: inspector mode. */
+        UIElement treeActions = UI.row(0, addPart, this.copyBodyPartBtn, this.pasteBodyPartBtn, this.removeBodyPartBtn);
+        treeActions.relative(this.outlinerHeader).x(0).y(0).w(80).h(20);
+
+        this.inspectorModeSwitch = UI.row(0, this.formModeBtn, this.keyframeModeBtn);
+        this.inspectorModeSwitch.relative(this.outlinerHeader).x(1F).y(0).w(20).h(20).anchorX(1F);
+
+        this.outlinerHeader.add(treeActions, this.inspectorModeSwitch);
+
+        this.formsList = new UIForms((l) ->
+        {
+            if (!l.isEmpty())
+            {
+                this.pickForm(l.get(0));
+            }
+        });
+        this.formsList.setReorderCallback(this::refillState);
+        this.formsList.relative(this.outliner).y(20).w(1F).h(1F, -20);
         this.formsList.context(this::createFormContextMenu);
+        this.formsList.keys().register(Keys.COPY, () ->
+        {
+            if (this.copyPasteController.copy())
+            {
+                this.updateBodyPartListButtons();
+            }
+        }).inside().label(UIKeys.FORMS_EDITOR_CONTEXT_COPY).active(this.copyPasteController::canCopy);
+        this.formsList.keys().register(Keys.PASTE, () ->
+        {
+            if (this.copyPasteController.paste(0, 0))
+            {
+                this.updateBodyPartListButtons();
+            }
+        }).inside().label(UIKeys.FORMS_EDITOR_CONTEXT_PASTE).active(this.copyPasteController::canPaste);
+
+        this.outliner.add(this.outlinerHeader, this.formsList);
+
         this.bodyPartEditor = new UIBodyPartEditor(this);
-        this.bodyPartEditor.relative(this.forms).w(1F).y(0.5F).h(0.5F);
+        this.bodyPartEditor.relative(this.forms).y(this.outlinerSplitRatio).w(1F).h(1F - this.outlinerSplitRatio);
+        this.bodyPartEditor.setVisible(false);
+
+        this.outlinerSplitter = new UIDraggable((context) ->
+        {
+            int diff = context.mouseY - this.forms.area.y;
+            float f = diff / (float) this.forms.area.h;
+
+            this.outlinerSplitRatio = MathUtils.clamp(f, 0.2F, 0.8F);
+            this.updateLeftSplit();
+        }).rendering((context) ->
+        {
+            float alpha = (this.outlinerSplitter.isDragging() || this.outlinerSplitter.area.isInside(context)) ? 0.75F : 0.45F;
+            int color = Colors.setA(BBSSettings.primaryColor.get(), alpha);
+
+            context.batcher.box(this.outlinerSplitter.area.x, this.outlinerSplitter.area.y + 2, this.outlinerSplitter.area.ex(), this.outlinerSplitter.area.ey() - 2, color);
+        }).dragEnd(() ->
+        {
+            if (BBSSettings.uiLayoutPreferences != null)
+            {
+                BBSSettings.uiLayoutPreferences.setFormOutlinerSplit(this.outlinerSplitRatio);
+            }
+        });
+        this.outlinerSplitter.relative(this.forms).y(this.outlinerSplitRatio).w(1F).h(6).anchor(0F, 0.5F);
+        this.outlinerSplitter.setVisible(false);
+
+        /* Right column: form inspector / keyframe props only. */
+        this.rightSidebar = new UIElement();
+        this.rightSidebar.relative(this).x(1F).w(inspectorWidth).minW(180).h(1F).anchorX(1F);
 
         this.formEditor = new UIElement();
-        this.formEditor.full(this);
+        this.formEditor.relative(this.rightSidebar).w(1F).h(1F);
 
-        this.statesEditor = new UIElement();
-        this.statesEditor.full(this);
+        this.keyframeEditorContainer = new UIElement()
+        {
+            @Override
+            public void render(UIContext context)
+            {
+                UIFormEditor.this.updateKeyframePlaceholderVisibility();
+
+                super.render(context);
+            }
+        };
+        this.keyframeEditorContainer.relative(this.rightSidebar).w(1F).h(1F);
+        /* Full width + labelAnchor: text is centered in the panel; wrapping handles long locales. */
+        this.keyframePlaceholder = UI.label(UIKeys.FORMS_EDITOR_KEYFRAMES_NONE_SELECTED)
+            .color(Colors.LIGHTER_GRAY)
+            .labelAnchor(0.5F, 0.5F)
+            .wrapping();
+        this.keyframePlaceholder.relative(this.keyframeEditorContainer).x(0.5F).y(0.5F).w(1F, -24).h(20).anchor(0.5F, 0.5F);
+        this.keyframeEditorContainer.add(this.keyframePlaceholder);
+        this.keyframeEditorContainer.setVisible(false);
+
+        this.statesEditor = new UIElement()
+        {
+            @Override
+            public void render(UIContext context)
+            {
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xFF18191C);
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.y + 1, 0xFF2A2B2F);
+                context.batcher.box(this.area.x + 20, this.area.y, this.area.x + 21, this.area.ey(), 0xFF2A2B2F);
+
+                super.render(context);
+            }
+        };
         this.statesEditor.setVisible(false);
-        this.statesKeyframes = new UIAnimationStateEditor(this);
-        this.statesKeyframes.relative(this.statesEditor).x(20).y(1F).w(1F, -20).h(BBSSettings.editorLayoutSettings.getStateEditorSizeV()).anchorY(1F);
 
         this.openStates = new UIIcon(Icons.MORE, (b) ->
         {
@@ -194,10 +465,10 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
             panel.setUndoId("animation_states_overlay_panel");
             UIOverlay.addOverlay(this.getContext(), panel, 280, 0.5F).eventPropagataion(EventPropagation.PASS);
         });
-        this.openStates.relative(this.statesEditor);
+        this.openStates.relative(this.statesEditor).x(0).y(1).w(20).h(20);
         this.openStates.tooltip(UIKeys.FORMS_EDITOR_STATES_OPEN, Direction.RIGHT);
         this.plause = new UIIcon(() -> this.playing ? Icons.PAUSE : Icons.PLAY, (b) -> this.plause());
-        this.plause.relative(this.openStates).y(1F);
+        this.plause.relative(this.statesEditor).x(0).y(21).w(20).h(20);
         this.plause.tooltip(UIKeys.CAMERA_EDITOR_KEYS_EDITOR_PLAUSE, Direction.RIGHT);
         this.shiftDuration = new UIIcon(Icons.SHIFT_TO, (b) ->
         {
@@ -208,16 +479,32 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
                 state.duration.set(this.cursor);
             }
         });
-        this.shiftDuration.relative(this.plause).y(1F);
+        this.shiftDuration.relative(this.statesEditor).x(0).y(41).w(20).h(20);
         this.shiftDuration.tooltip(UIKeys.CAMERA_TIMELINE_CONTEXT_SHIFT_DURATION, Direction.RIGHT);
         this.shiftDuration.keys().register(Keys.CLIP_SHIFT, () -> this.shiftDuration.clickItself());
 
-        this.renderer = new UIPickableFormRenderer(this);
+        this.statesKeyframes = new UIAnimationStateEditor(this);
+        this.statesKeyframes.relative(this.statesEditor).x(21).y(1).w(1F, -21).h(1F, -1);
+
+        this.statesEditor.add(this.openStates, this.plause, this.shiftDuration, this.statesKeyframes);
+
+        this.modelSettingsEditor = new UIFormModelEditor(this);
+        this.modelSettingsEditor.full(this);
+        this.modelSettingsEditor.setVisible(false);
+
+        this.renderer = rendererFactory.apply(this);
+        this.renderer.setRenderForm(() -> this.modelSettingsEditor == null || !this.modelSettingsEditor.isVisible());
+        this.renderer.updatable();
         this.renderer.full(this);
 
         this.finish = new UIIcon(Icons.IN, (b) -> this.palette.exit());
-        this.finish.tooltip(UIKeys.FORMS_EDITOR_FINISH, Direction.RIGHT).relative(this.formEditor).xy(0, 1F).anchorY(1F);
-        this.toggleSidebar = new UIIcon(() -> this.forms.isVisible() ? Icons.LEFTLOAD : Icons.RIGHTLOAD, (b) ->
+        this.finish.tooltip(UIKeys.FORMS_EDITOR_FINISH, Direction.RIGHT);
+        this.toggleSidebar = new UIIcon(() ->
+        {
+            boolean open = (this.forms != null && this.forms.isVisible()) || (this.rightSidebar != null && this.rightSidebar.isVisible());
+
+            return open ? Icons.LEFTLOAD : Icons.RIGHTLOAD;
+        }, (b) ->
         {
             this.toggleSidebar();
 
@@ -226,41 +513,175 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         this.toggleSidebar.tooltip(UIKeys.FORMS_EDITOR_TOGGLE_TREE, Direction.RIGHT);
         this.openStateEditor = new UIIcon(Icons.GALLERY, (b) -> this.toggleStateEditor());
         this.openStateEditor.tooltip(UIKeys.FORMS_EDITOR_STATES_TOGGLE, Direction.RIGHT);
-        this.icons = UI.column(this.openStateEditor, this.toggleSidebar, this.finish);
-        this.icons.relative(this).y(1F).w(20).anchorY(1F);
+        this.openStateEditor.activeBackground(Colors.A50 | Colors.BLUE);
+        this.openModelEditor = new UIIcon(Icons.PLAYER, (b) -> this.toggleModelEditor());
+        this.openModelEditor.tooltip(UIKeys.MODELS_TITLE, Direction.RIGHT);
+        this.openModelEditor.setEnabled(false);
 
-        UIRenderable background = new UIRenderable((context) ->
+        this.icons = new UIElement()
+        {
+            @Override
+            public void render(UIContext context)
+            {
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xCC18191C);
+                context.batcher.outline(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xFF2A2B2F);
+                super.render(context);
+            }
+        };
+        this.icons.column(0).vertical().stretch().height(20);
+        this.icons.add(this.openModelEditor, this.openStateEditor, this.toggleSidebar, this.finish);
+        /* Sit in the gutter just to the right of the left outliner (bbs-fs 2.3 style). */
+        this.icons.relative(this.forms).x(1F, 8).y(1F, -8).w(20).h(4 * 20).anchorY(1F);
+
+        UIRenderable sidebarsBackground = new UIRenderable((context) ->
         {
             if (this.forms.isVisible())
             {
-                this.forms.area.render(context.batcher, Colors.A50);
+                context.batcher.box(this.forms.area.x, this.forms.area.y, this.forms.area.ex(), this.forms.area.ey(), 0xFF18191C);
+                context.batcher.box(this.forms.area.ex() - 1, this.forms.area.y, this.forms.area.ex(), this.forms.area.ey(), 0xFF2A2B2F);
+            }
+
+            if (this.rightSidebar.isVisible())
+            {
+                context.batcher.box(this.rightSidebar.area.x, this.rightSidebar.area.y, this.rightSidebar.area.ex(), this.rightSidebar.area.ey(), 0xFF18191C);
+                context.batcher.box(this.rightSidebar.area.x, this.rightSidebar.area.y, this.rightSidebar.area.x + 1, this.rightSidebar.area.ey(), 0xFF2A2B2F);
             }
         });
 
-        UIRenderable backgroundStates = new UIRenderable((context) ->
-        {
-            context.batcher.box(this.area.x, this.area.y, this.area.x + 20, this.area.ey(), Colors.A100);
-        });
-
-        UIDraggable draggable = new UIDraggable((context) ->
+        UIDraggable treeResizer = new UIDraggable((context) ->
         {
             int diff = context.mouseX - this.forms.area.x;
             float f = diff / (float) this.area.w;
 
-            treeWidth = MathUtils.clamp(f, 0F, 0.5F);
-
+            treeWidth = MathUtils.clamp(f, 0.12F, 0.4F);
             this.forms.w(treeWidth).resize();
+            this.updateLeftSplit();
+            this.updateStatesEditorLayout();
+            this.resize();
+        }).dragEnd(() ->
+        {
+            if (BBSSettings.uiLayoutPreferences != null)
+            {
+                BBSSettings.uiLayoutPreferences.setFormTreeWidth(treeWidth);
+            }
         });
+        treeResizer.relative(this.forms).x(1F).y(0.5F).w(6).h(40).anchor(0.5F, 0.5F);
 
-        draggable.relative(this.forms).x(1F).y(0.5F).w(6).h(40).anchor(0.5F, 0.5F);
+        UIDraggable inspectorResizer = new UIDraggable((context) ->
+        {
+            int diff = this.area.ex() - context.mouseX;
+            float f = diff / (float) this.area.w;
 
-        this.forms.add(background, this.formsList, this.bodyPartEditor, draggable);
-        this.formEditor.add(this.forms);
-        this.statesEditor.add(backgroundStates, this.openStates, this.plause, this.shiftDuration, this.statesKeyframes);
-        this.add(this.renderer, this.formEditor, this.statesEditor, this.icons);
+            inspectorWidth = MathUtils.clamp(f, 0.15F, 0.45F);
+            this.rightSidebar.w(inspectorWidth).resize();
+            this.updateStatesEditorLayout();
+            this.resize();
+        });
+        inspectorResizer.relative(this.rightSidebar).x(0F).y(0.5F).w(6).h(40).anchor(0.5F, 0.5F);
+
+        /* Gizmo mode toolbar */
+        this.gizmoTargetBtn = new UIIcon(this::getGizmoTargetIcon, (b) ->
+        {
+            this.cycleGizmoTarget();
+            UIUtils.playClick();
+        });
+        this.gizmoTargetBtn.tooltip(UIKeys.FILM_GIZMO_TARGET, Direction.RIGHT);
+        this.gizmoMove = this.createGizmoModeButton(Icons.ALL_DIRECTIONS, Gizmo.Mode.TRANSLATE, UIKeys.FILM_GIZMO_MOVE);
+        this.gizmoScale = this.createGizmoModeButton(Icons.SCALE, Gizmo.Mode.SCALE, UIKeys.FILM_GIZMO_SCALE);
+        this.gizmoRotate = this.createGizmoModeButton(Icons.ARC, Gizmo.Mode.ROTATE, UIKeys.FILM_GIZMO_ROTATE);
+        this.gizmoCombined = this.createGizmoModeButton(Icons.SHAPES, Gizmo.Mode.COMBINED, UIKeys.FILM_GIZMO_COMBINED);
+        this.gizmoTop = this.createGizmoModeButton(Icons.SPHERE, Gizmo.Mode.TOP, UIKeys.FILM_GIZMO_TOP);
+
+        this.gizmoVisualSize = new UIIcon(Icons.MAXIMIZE, (b) ->
+        {
+            if (this.getContext() != null)
+            {
+                this.getContext().replaceContextMenu(new UIGizmoSizeContextMenu());
+            }
+        });
+        this.gizmoVisualSize.tooltip(UIKeys.FILM_GIZMO_SIZE, Direction.RIGHT);
+
+        this.gizmoThickness = new UIIcon(Icons.LINE, (b) ->
+        {
+            if (this.getContext() != null)
+            {
+                this.getContext().replaceContextMenu(new UIGizmoThicknessContextMenu());
+            }
+        });
+        this.gizmoThickness.tooltip(UIKeys.FILM_GIZMO_THICKNESS, Direction.RIGHT);
+
+        this.gizmoTranslateSpeed = new UIIcon(Icons.FORWARD, (b) ->
+        {
+            if (this.getContext() != null)
+            {
+                this.getContext().replaceContextMenu(new UIGizmoTranslateSpeedContextMenu());
+            }
+        });
+        this.gizmoTranslateSpeed.tooltip(UIKeys.FILM_GIZMO_TRANSLATE_SPEED, Direction.RIGHT);
+
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.TARGET, this.gizmoTargetBtn);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.MOVE, this.gizmoMove);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.SCALE, this.gizmoScale);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.ROTATE, this.gizmoRotate);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.COMBINED, this.gizmoCombined);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.TOP, this.gizmoTop);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.SIZE, this.gizmoVisualSize);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.THICKNESS, this.gizmoThickness);
+        this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.TRANSLATE_SPEED, this.gizmoTranslateSpeed);
+
+        this.gizmoToolbar = new UIElement()
+        {
+            @Override
+            public void render(UIContext context)
+            {
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xCC18191C);
+                context.batcher.outline(this.area.x, this.area.y, this.area.ex(), this.area.ey(), 0xFF2A2B2F);
+
+                Gizmo.Mode gizmoMode = Gizmo.INSTANCE.getMode();
+
+                UIFormEditor.this.refreshGizmoTargetButton();
+                UIFormEditor.this.gizmoMove.active(gizmoMode == Gizmo.Mode.TRANSLATE);
+                UIFormEditor.this.gizmoScale.active(gizmoMode == Gizmo.Mode.SCALE);
+                UIFormEditor.this.gizmoRotate.active(gizmoMode == Gizmo.Mode.ROTATE);
+                UIFormEditor.this.gizmoCombined.active(gizmoMode == Gizmo.Mode.COMBINED);
+                UIFormEditor.this.gizmoTop.active(gizmoMode == Gizmo.Mode.TOP);
+
+                super.render(context);
+            }
+
+            @Override
+            protected boolean subMouseClicked(UIContext context)
+            {
+                if (context.mouseButton == 1 && this.area.isInside(context))
+                {
+                    UIFormEditor.this.openGizmoToolbarCustomizer();
+                    UIUtils.playClick();
+
+                    return true;
+                }
+
+                return super.subMouseClicked(context);
+            }
+        };
+        this.gizmoToolbar.column(0).vertical().stretch().height(20);
+        /* Anchor to the right edge of the left outliner — not the screen edge. */
+        this.gizmoToolbar.relative(this.forms).x(1F, 8).y(8).w(20);
+        this.rebuildGizmoToolbar();
+        BBSSettings.editorFormGizmoToolbar.postCallback((v, f) -> this.rebuildGizmoToolbar());
+
+        this.forms.add(this.outliner, this.outlinerSplitter, this.bodyPartEditor, treeResizer);
+        this.rightSidebar.add(this.formEditor, this.keyframeEditorContainer, inspectorResizer);
+        this.add(this.renderer, sidebarsBackground, this.forms, this.rightSidebar, this.statesEditor, this.modelSettingsEditor, this.gizmoToolbar, this.icons);
 
         this.keys().register(Keys.UNDO, this::undo);
         this.keys().register(Keys.REDO, this::redo);
+        this.keys().register(Keys.DELETE, () ->
+        {
+            if (this.hasSelectedBodyParts())
+            {
+                this.removeBodyPart();
+            }
+        });
         this.keys().register(Keys.FORMS_OPEN_STATES_EDITOR, () ->
         {
             if (!this.statesEditor.isVisible())
@@ -279,6 +700,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
             UIUtils.playClick();
         });
 
+        this.updateStatesEditorLayout();
         this.setUndoId("form_editor");
     }
 
@@ -288,17 +710,22 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         {
             return true;
         }
-        else if (stencil.hasPicked() && context.mouseButton == 0)
+
+        UIPropTransform editableTransform = this.getGizmoDragTransform();
+
+        this.renderer.setPoseBoneGizmoDrag(this.isPoseBoneGizmo(editableTransform));
+
+        if (context.mouseButton == 0 && this.renderer.getGizmoController().tryStartHandleDrag(context, editableTransform))
+        {
+            return true;
+        }
+
+        if (stencil.hasPicked() && context.mouseButton == 0)
         {
             Pair<Form, String> pair = stencil.getPicked();
 
             if (pair != null)
             {
-                if (Gizmo.INSTANCE.start(stencil.getIndex(), context.mouseX, context.mouseY, this.editor.getEditableTransform()))
-                {
-                    return true;
-                }
-
                 this.pickFormFromRenderer(pair);
 
                 return true;
@@ -306,6 +733,326 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         }
 
         return false;
+    }
+
+    /** Completes a pending trackball press: click-through selects the bone/form under the
+     *  sphere; otherwise just stops any active gizmo drag. */
+    public void finishGizmoPendingClick()
+    {
+        Pair<Form, String> formPick = this.renderer.getGizmoController().consumePendingTrackballClick();
+
+        if (formPick != null)
+        {
+            this.pickFormFromRenderer(formPick);
+        }
+
+        this.renderer.getGizmoController().stop();
+        this.statesKeyframes.finishGizmoPendingClick();
+    }
+
+    /** Which transform the gizmo should drag: the form's own general transform when the
+     *  toolbar target is FORM, the form/bone pose transform otherwise (POSE). */
+    private UIPropTransform getGizmoDragTransform()
+    {
+        if (this.gizmoTarget == GizmoTarget.FORM && this.editor != null)
+        {
+            return this.editor.getEditableTransform();
+        }
+
+        if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            UIPoseEditor poseEditor = this.modelSettingsEditor.getPoseEditor();
+
+            if (poseEditor != null)
+            {
+                return poseEditor.transform;
+            }
+        }
+
+        if (this.editor instanceof UIModelForm modelForm)
+        {
+            return modelForm.getPoseGizmoTransform();
+        }
+
+        if (this.editor == null || this.editor.generalPanel == null)
+        {
+            return null;
+        }
+
+        return this.editor.generalPanel.transform;
+    }
+
+    /** Pose bone handles (Model Block Edit / form palette Pose), not General or body-part. */
+    private boolean isPoseBoneGizmo(UIPropTransform transform)
+    {
+        if (transform == null || this.gizmoTarget != GizmoTarget.POSE)
+        {
+            return false;
+        }
+
+        if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            UIPoseEditor poseEditor = this.modelSettingsEditor.getPoseEditor();
+
+            if (poseEditor != null && transform == poseEditor.transform)
+            {
+                return true;
+            }
+        }
+
+        return this.editor instanceof UIModelForm modelForm
+            && transform == modelForm.getPoseGizmoTransform();
+    }
+
+    public boolean isGizmoTargetingFormTransform()
+    {
+        return this.gizmoTarget == GizmoTarget.FORM;
+    }
+
+    private boolean supportsPoseGizmoTarget()
+    {
+        return this.editor instanceof UIModelForm;
+    }
+
+    private boolean isGizmoTargetValid(GizmoTarget target)
+    {
+        if (target == GizmoTarget.POSE)
+        {
+            return this.supportsPoseGizmoTarget();
+        }
+
+        return true;
+    }
+
+    private GizmoTarget nextGizmoTarget(GizmoTarget current)
+    {
+        if (!this.supportsPoseGizmoTarget())
+        {
+            return GizmoTarget.FORM;
+        }
+
+        return current == GizmoTarget.POSE ? GizmoTarget.FORM : GizmoTarget.POSE;
+    }
+
+    private void cycleGizmoTarget()
+    {
+        if (!this.supportsPoseGizmoTarget())
+        {
+            return;
+        }
+
+        GizmoTarget start = this.gizmoTarget;
+        GizmoTarget next = this.nextGizmoTarget(start);
+
+        while (!this.isGizmoTargetValid(next) && next != start)
+        {
+            next = this.nextGizmoTarget(next);
+        }
+
+        if (this.isGizmoTargetValid(next))
+        {
+            this.setGizmoTarget(next);
+        }
+    }
+
+    private void setGizmoTarget(GizmoTarget target)
+    {
+        if (!this.isGizmoTargetValid(target))
+        {
+            return;
+        }
+
+        GizmoTarget previous = this.gizmoTarget;
+
+        this.gizmoTarget = target;
+
+        if (target == GizmoTarget.FORM)
+        {
+            this.enableFormTransformGizmoFromGeneralPanel();
+        }
+        else if (previous == GizmoTarget.FORM)
+        {
+            this.disableFormTransformGizmo();
+
+            if (target == GizmoTarget.POSE && this.editor instanceof UIModelForm modelForm)
+            {
+                modelForm.showPosePanel();
+            }
+        }
+
+        this.refreshGizmoTargetButton();
+    }
+
+    private Icon getGizmoTargetIcon()
+    {
+        if (this.gizmoTarget == GizmoTarget.FORM)
+        {
+            return Icons.GEAR;
+        }
+
+        return Icons.POSE;
+    }
+
+    private IKey getGizmoTargetTooltip()
+    {
+        if (this.gizmoTarget == GizmoTarget.FORM)
+        {
+            return UIKeys.FILM_GIZMO_TRANSFORM;
+        }
+
+        return UIKeys.FILM_GIZMO_POSE;
+    }
+
+    private void refreshGizmoTargetButton()
+    {
+        if (this.gizmoTargetBtn == null)
+        {
+            return;
+        }
+
+        if (this.gizmoTarget == GizmoTarget.POSE && !this.supportsPoseGizmoTarget())
+        {
+            this.gizmoTarget = GizmoTarget.FORM;
+        }
+
+        this.gizmoTargetBtn.tooltip(this.getGizmoTargetTooltip(), Direction.RIGHT);
+        this.gizmoTargetBtn.active(false);
+        this.gizmoTargetBtn.setEnabled(this.supportsPoseGizmoTarget());
+    }
+
+    /** Enables the toolbar form-transform target and wires it to the form transform (General need not be open). */
+    public void enableFormTransformGizmo()
+    {
+        this.setGizmoTarget(GizmoTarget.FORM);
+    }
+
+    /** Called when the General sidebar tab is selected — avoids re-entering {@link UIForm#setPanel}. */
+    public void enableFormTransformGizmoFromGeneralPanel()
+    {
+        this.gizmoTarget = GizmoTarget.FORM;
+
+        if (this.editor != null && this.editor.generalPanel != null && this.editor.form != null)
+        {
+            this.editor.generalPanel.transform.setTransform(this.editor.form.transform.get());
+        }
+
+        if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            this.modelSettingsEditor.enterFormTransformGizmoMode();
+        }
+
+        this.refreshGizmoTargetButton();
+    }
+
+    /** Turns off the toolbar form-transform target and leaves form-transform edit mode in the model editor. */
+    public void disableFormTransformGizmo()
+    {
+        if (this.modelSettingsEditor != null)
+        {
+            this.modelSettingsEditor.exitFormTransformGizmoMode();
+        }
+
+        if (this.gizmoTarget == GizmoTarget.FORM)
+        {
+            this.gizmoTarget = this.supportsPoseGizmoTarget() ? GizmoTarget.POSE : GizmoTarget.FORM;
+        }
+
+        this.refreshGizmoTargetButton();
+    }
+
+    /* Build a single gizmo transform-mode button that selects its mode and highlights while
+       that mode is active (same behavior as the film viewport's buttons). */
+    public void rebuildGizmoToolbar()
+    {
+        this.gizmoToolbar.removeAll();
+
+        for (String id : BBSSettings.editorFormGizmoToolbar.getVisibleOrder())
+        {
+            UIIcon button = this.gizmoButtonMap.get(id);
+
+            if (button == null)
+            {
+                continue;
+            }
+
+            button.setVisible(true);
+            this.gizmoToolbar.add(button);
+        }
+
+        int totalH = this.area.h;
+        float vSize = BBSSettings.editorLayoutSettings.getStateEditorSizeV();
+        int timelineH = (this.statesEditor != null && this.statesEditor.isVisible()) ? (int) (totalH * vSize) : 0;
+        int viewportH = totalH - timelineH;
+        boolean spaceConstrained = this.statesEditor != null && this.statesEditor.isVisible() && (totalH > 0 && viewportH < 260);
+
+        this.updateGizmoToolbarLayout(spaceConstrained);
+    }
+
+    public void updateGizmoToolbarLayout(boolean twoColumns)
+    {
+        if (this.gizmoToolbar == null)
+        {
+            return;
+        }
+
+        int count = this.gizmoToolbar.getChildren().size();
+
+        if (count == 0)
+        {
+            return;
+        }
+
+        this.gizmoToolbar.post(null);
+
+        if (twoColumns && count > 1)
+        {
+            int rows = (count + 1) / 2;
+
+            this.gizmoToolbar.grid(0).items(2).height(20);
+            this.gizmoToolbar.w(40);
+            this.gizmoToolbar.h(Math.max(20, rows * 20));
+        }
+        else
+        {
+            this.gizmoToolbar.column(0).vertical().stretch().height(20);
+            this.gizmoToolbar.w(20);
+            this.gizmoToolbar.h(Math.max(20, count * 20));
+        }
+
+        this.gizmoToolbar.resize();
+    }
+
+    private void openGizmoToolbarCustomizer()
+    {
+        if (this.getContext() == null)
+        {
+            return;
+        }
+
+        UIOverlay.addOverlay(this.getContext(), new UIFormEditorGizmoToolbarOverlayPanel(this::rebuildGizmoToolbar), 320, 180);
+    }
+
+    private UIIcon createGizmoModeButton(Icon icon, Gizmo.Mode mode, IKey tooltip)
+    {
+        UIIcon button = new UIIcon(icon, (b) ->
+        {
+            Gizmo.INSTANCE.setMode(mode);
+            UIUtils.playClick();
+        });
+
+        button.tooltip(tooltip, Direction.RIGHT);
+        button.activeBackground(Colors.A50 | Colors.BLUE);
+
+        return button;
+    }
+
+    /** Leave the nested model editor and return to the form editor, like Esc does first. */
+    private void closeModelEditorIfOpen()
+    {
+        if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            this.toggleModelEditor();
+        }
     }
 
     public void pickFormFromRenderer(Pair<Form, String> pair)
@@ -318,12 +1065,28 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
     private void pickFormBone(Form form, String bone)
     {
-        this.formsList.setCurrentForm(form);
-        this.pickForm(this.formsList.getCurrentFirst());
+        if (form == null)
+        {
+            return;
+        }
 
-        if (!bone.isEmpty())
+        Form currentForm = this.formsList.getCurrentFirst() != null ? this.formsList.getCurrentFirst().getForm() : null;
+
+        if (form != currentForm)
+        {
+            this.formsList.setCurrentForm(form);
+            this.pickForm(this.formsList.getCurrentFirst());
+        }
+
+        if (!bone.isEmpty() && this.editor != null)
         {
             this.editor.pickBone(bone);
+
+            /* Selection implies pose context — match gizmos to the picked bone. */
+            if (this.supportsPoseGizmoTarget())
+            {
+                this.setGizmoTarget(GizmoTarget.POSE);
+            }
         }
     }
 
@@ -345,15 +1108,153 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         this.playing = !this.playing;
     }
 
+    public void updateStatesEditorLayout()
+    {
+        if (this.statesEditor == null)
+        {
+            return;
+        }
+
+        float vSize = BBSSettings.editorLayoutSettings.getStateEditorSizeV();
+
+        this.statesEditor.resetFlex().relative(this).x(0).y(1F).h(vSize).anchorY(1F);
+
+        if (this.rightSidebar != null && this.rightSidebar.isVisible())
+        {
+            this.statesEditor.wTo(this.rightSidebar.area);
+        }
+        else
+        {
+            this.statesEditor.w(1F);
+        }
+
+        int totalH = this.area.h;
+        int timelineH = this.statesEditor.isVisible() ? (int) (totalH * vSize) : 0;
+        int viewportH = totalH - timelineH;
+        boolean spaceConstrained = this.statesEditor.isVisible() && (totalH > 0 && viewportH < 260);
+
+        if (this.icons != null)
+        {
+            this.icons.post(null);
+
+            if (this.statesEditor.isVisible())
+            {
+                this.icons.row(0);
+                this.icons.relative(this.forms).x(1F, 8).y(1F - vSize, -8).w(4 * 20).h(20).anchorY(1F);
+            }
+            else
+            {
+                this.icons.column(0).vertical().stretch().height(20);
+                this.icons.relative(this.forms).x(1F, 8).y(1F, -8).w(20).h(4 * 20).anchorY(1F);
+            }
+
+            this.icons.resize();
+        }
+
+        if (this.gizmoToolbar != null && this.forms != null)
+        {
+            this.gizmoToolbar.relative(this.forms).x(1F, 8).y(8);
+        }
+
+        this.updateGizmoToolbarLayout(spaceConstrained);
+
+        if (this.keyframeModeBtn != null)
+        {
+            boolean statesOpen = this.statesEditor.isVisible();
+
+            this.keyframeModeBtn.setVisible(statesOpen);
+
+            if (this.inspectorModeSwitch != null)
+            {
+                this.inspectorModeSwitch.w(statesOpen ? 40 : 20).resize();
+            }
+
+            if (!statesOpen && this.inspectorMode == InspectorMode.KEYFRAME)
+            {
+                this.setInspectorMode(InspectorMode.FORM);
+            }
+        }
+
+        if (this.openStateEditor != null)
+        {
+            this.openStateEditor.active(this.statesEditor.isVisible());
+        }
+    }
+
+    @Override
+    public void resize()
+    {
+        this.updateStatesEditorLayout();
+        super.resize();
+    }
+
     private void toggleStateEditor()
     {
-        this.formEditor.toggleVisible();
+        this.closeModelEditorIfOpen();
+
         this.statesEditor.toggleVisible();
+        this.updateStatesEditorLayout();
+        this.resize();
+    }
+
+    private void toggleModelEditor()
+    {
+        ModelForm modelForm = this.getEditedModelForm();
+
+        if (modelForm == null)
+        {
+            return;
+        }
+
+        String modelId = modelForm.model.get();
+
+        if (modelId == null || modelId.isEmpty())
+        {
+            return;
+        }
+
+        if (UIScreen.getCurrentMenu() instanceof UIDashboard dashboard)
+        {
+            if (dashboard.documentTabsBar != null)
+            {
+                dashboard.documentTabsBar.addOrActivate(ContentType.MODELS, modelId);
+            }
+        }
+    }
+
+    private ModelForm getEditedModelForm()
+    {
+        if (this.editor != null && this.editor.form instanceof ModelForm modelForm)
+        {
+            return modelForm;
+        }
+
+        return null;
+    }
+
+    private void updateModelEditorButton()
+    {
+        if (this.openModelEditor == null)
+        {
+            return;
+        }
+
+        ModelForm modelForm = this.getEditedModelForm();
+        boolean hasModel = modelForm != null && modelForm.model.get() != null && !modelForm.model.get().isEmpty();
+
+        this.openModelEditor.setEnabled(hasModel);
     }
 
     private void toggleSidebar()
     {
-        this.forms.toggleVisible();
+        this.closeModelEditorIfOpen();
+
+        boolean visible = !(this.forms.isVisible() || this.rightSidebar.isVisible());
+
+        this.forms.setVisible(visible);
+        this.rightSidebar.setVisible(visible);
+        this.updateStatesEditorLayout();
+        this.resize();
     }
 
     private void createFormContextMenu(ContextMenuManager menu)
@@ -363,7 +1264,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         if (current != null)
         {
             menu.custom(new UIPresetContextMenu(this.copyPasteController)
-                .labels(UIKeys.FORMS_EDITOR_CONTEXT_COPY, UIKeys.FORMS_EDITOR_CONTEXT_PASTE));
+                .labels(this.getBodyPartCopyLabel(), UIKeys.FORMS_EDITOR_CONTEXT_PASTE));
 
             if (current.getForm() != null)
             {
@@ -372,6 +1273,14 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
             if (current.part != null)
             {
+                if (current.getForm() instanceof FramebufferForm framebuffer && current.form instanceof ModelForm parent)
+                {
+                    menu.action(Icons.CAMERA, UIKeys.FORMS_EDITOR_CONTEXT_SETUP_FACE, () ->
+                    {
+                        UIOverlay.addOverlay(this.getContext(), new UISetupFaceOverlayPanel((model, offset) -> this.setupFace(framebuffer, parent, model, offset)), 240, 170);
+                    });
+                }
+
                 List<BodyPart> all = current.part.getManager().getAllTyped();
 
                 if (all.size() > 1)
@@ -393,11 +1302,102 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
                 }
             }
 
-            if (current.part != null)
+            if (this.hasSelectedBodyParts())
             {
-                menu.action(Icons.REMOVE, UIKeys.FORMS_EDITOR_CONTEXT_REMOVE, this::removeBodyPart);
+                menu.action(Icons.REMOVE, this.getBodyPartRemoveLabel(), this::removeBodyPart);
             }
         }
+    }
+
+    /*
+     * Fill a framebuffer form with the pieces a face is made of: the parent model's own texture
+     * as a flat billboard, its face square erased from the parent so the framebuffer shows
+     * through, and a rig for the eyes on top of it.
+     */
+    private void setupFace(FramebufferForm framebuffer, ModelForm parent, String model, double verticalOffset)
+    {
+        BaseValue.edit(parent, (v) ->
+        {
+            BillboardForm face = new BillboardForm();
+            ModelForm eyes = new ModelForm();
+            BodyPart facePart = new BodyPart("");
+            BodyPart eyesPart = new BodyPart("");
+
+            face.texture.set(parent.texture.get());
+
+            if (face.texture.get() == null)
+            {
+                ModelInstance parentModel = ModelFormRenderer.getModel(parent);
+
+                if (parentModel != null)
+                {
+                    face.texture.set(parentModel.texture);
+                }
+            }
+
+            Link texture = face.texture.get();
+            Vector4f crop = new Vector4f(8F, 8F, 48F, 48F);
+
+            if (texture != null)
+            {
+                Texture skin = BBSModClient.getTextures().getTexture(texture);
+                int textureScale = 1;
+
+                if (skin.width >= 64 && skin.width % 64 == 0)
+                {
+                    textureScale = skin.width / 64;
+                    crop.set(8F * textureScale, 8F * textureScale, skin.width - 16F * textureScale, skin.height - 16F * textureScale);
+                }
+
+                MultiLink multi = texture instanceof MultiLink existing ? (MultiLink) existing.copy() : new MultiLink();
+
+                if (!(texture instanceof MultiLink))
+                {
+                    multi.children.add(new FilteredLink(texture));
+                }
+
+                FilteredLink erase = new FilteredLink(Link.assets("textures/pixel.png"));
+
+                erase.erase = true;
+                erase.shiftX = 8 * textureScale;
+                erase.shiftY = 8 * textureScale;
+                erase.scale = 8F * textureScale;
+                multi.children.add(erase);
+                multi.recalculateId();
+                parent.texture.set(multi);
+            }
+
+            face.resizeCrop.set(true);
+            face.crop.set(crop);
+            facePart.setForm(face);
+            facePart.transform.get().translate.set(0F, -0.5F, 0F);
+
+            eyes.model.set(model);
+            eyesPart.setForm(eyes);
+            eyesPart.transform.get().translate.set(0F, (float) (-1D + verticalOffset / 8D), -0.495F);
+            eyesPart.transform.get().scale.set(2F);
+
+            framebuffer.transform.get().translate.set(0F, 0.5F, 0.25F);
+            framebuffer.parts.addBodyPart(facePart);
+            framebuffer.parts.addBodyPart(eyesPart);
+        });
+
+        this.refreshFormList();
+        this.switchEditor(framebuffer);
+        this.refillState();
+    }
+
+    private boolean hasSelectedBodyParts()
+    {
+        for (UIForms.FormEntry entry : this.formsList.getCurrent())
+        {
+            if (entry.part != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void moveBodyPart(UIForms.FormEntry current, int direction)
@@ -444,41 +1444,254 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
     private MapType copyBodyPart()
     {
-        return this.formsList.getCurrentFirst().part.toData().asMap();
+        List<UIForms.FormEntry> selected = this.formsList.getCurrent();
+
+        if (selected.size() > 1)
+        {
+            ListType parts = new ListType();
+
+            for (UIForms.FormEntry entry : selected)
+            {
+                if (entry.part != null)
+                {
+                    parts.add(entry.part.toData());
+                }
+            }
+
+            if (parts.size() == 0)
+            {
+                return null;
+            }
+
+            MapType wrapper = new MapType();
+
+            wrapper.put("body_parts", parts);
+
+            return wrapper;
+        }
+
+        UIForms.FormEntry current = this.formsList.getCurrentFirst();
+
+        if (current == null || current.part == null)
+        {
+            return null;
+        }
+
+        return current.part.toData().asMap();
     }
 
     private void pasteBodyPart(MapType data, int mouseX, int mouseY)
     {
-        BodyPart part = new BodyPart("");
+        if (data.has("body_parts"))
+        {
+            ListType parts = data.getList("body_parts");
 
-        part.fromData(data);
-        this.addBodyPart(part);
+            for (BaseType partData : parts)
+            {
+                BodyPart part = new BodyPart("");
+
+                part.fromData(partData);
+                this.addBodyPart(part);
+            }
+        }
+        else
+        {
+            BodyPart part = new BodyPart("");
+
+            part.fromData(data);
+            this.addBodyPart(part);
+        }
+
         this.refillState();
+    }
+
+    private IKey getBodyPartRemoveLabel()
+    {
+        int count = 0;
+
+        for (UIForms.FormEntry entry : this.formsList.getCurrent())
+        {
+            if (entry.part != null)
+            {
+                count++;
+            }
+        }
+
+        return count > 1 ? UIKeys.FORMS_EDITOR_CONTEXT_REMOVE_ALL : UIKeys.FORMS_EDITOR_CONTEXT_REMOVE;
+    }
+
+    private IKey getBodyPartCopyLabel()
+    {
+        int count = 0;
+
+        for (UIForms.FormEntry entry : this.formsList.getCurrent())
+        {
+            if (entry.part != null)
+            {
+                count++;
+            }
+        }
+
+        return count > 1 ? UIKeys.FORMS_EDITOR_CONTEXT_COPY_ALL : UIKeys.FORMS_EDITOR_CONTEXT_COPY;
     }
 
     private void removeBodyPart()
     {
-        int index = this.formsList.getIndex();
-        UIForms.FormEntry current = this.formsList.getCurrentFirst();
+        List<UIForms.FormEntry> selected = this.formsList.getCurrent();
+        List<BodyPart> parts = new ArrayList<>();
 
-        current.form.parts.removeBodyPart(current.part);
+        for (UIForms.FormEntry entry : selected)
+        {
+            if (entry.part != null)
+            {
+                parts.add(entry.part);
+            }
+        }
+
+        if (parts.isEmpty() || this.form == null)
+        {
+            return;
+        }
+
+        int index = this.formsList.getIndex();
+
+        this.undoHandler.handlePreValues(this.form.parts, 0);
+
+        for (BodyPart part : parts)
+        {
+            part.getManager().removeBodyPart(part);
+        }
 
         this.refreshFormList();
-        this.formsList.setIndex(index - 1);
-        this.pickForm(this.formsList.getCurrentFirst());
+
+        if (!this.formsList.getList().isEmpty())
+        {
+            this.formsList.setIndex(Math.max(0, Math.min(index, this.formsList.getList().size() - 1)));
+            UIForms.FormEntry first = this.formsList.getCurrentFirst();
+
+            if (first != null)
+            {
+                this.pickForm(first);
+            }
+        }
+
         this.refillState();
+    }
+
+    public void setInspectorMode(InspectorMode mode)
+    {
+        if (mode == InspectorMode.BODY_PART)
+        {
+            mode = InspectorMode.FORM;
+        }
+
+        this.inspectorMode = mode;
+
+        boolean isForm = mode == InspectorMode.FORM;
+        boolean isKeyframe = mode == InspectorMode.KEYFRAME;
+
+        this.formEditor.setVisible(isForm);
+
+        if (this.keyframeEditorContainer != null)
+        {
+            this.keyframeEditorContainer.setVisible(isKeyframe);
+            this.updateKeyframePlaceholderVisibility();
+        }
+
+        if (this.formModeBtn != null)
+        {
+            this.formModeBtn.active(isForm);
+        }
+
+        if (this.keyframeModeBtn != null)
+        {
+            this.keyframeModeBtn.active(isKeyframe);
+        }
+
+        this.rightSidebar.resize();
+    }
+
+    private void updateKeyframePlaceholderVisibility()
+    {
+        if (this.keyframePlaceholder == null || this.keyframeEditorContainer == null)
+        {
+            return;
+        }
+
+        /* Placeholder is the only permanent child; a factory panel is added when a keyframe is selected. */
+        this.keyframePlaceholder.setVisible(this.keyframeEditorContainer.getChildren().size() <= 1);
     }
 
     private void pickForm(UIForms.FormEntry entry)
     {
-        this.bodyPartEditor.setVisible(entry.part != null);
+        if (entry == null)
+        {
+            return;
+        }
 
         if (entry.part != null)
         {
             this.bodyPartEditor.setPart(entry.part, entry.form);
+            this.bodyPartEditor.setVisible(true);
+            this.outlinerSplitter.setVisible(true);
+        }
+        else
+        {
+            this.bodyPartEditor.setVisible(false);
+            this.outlinerSplitter.setVisible(false);
         }
 
+        this.updateLeftSplit();
         this.switchEditor(entry.getForm());
+        this.updateBodyPartListButtons();
+        this.refreshGizmoTargetButton();
+    }
+
+    private void updateBodyPartListButtons()
+    {
+        if (this.copyBodyPartBtn != null)
+        {
+            this.copyBodyPartBtn.setEnabled(this.copyPasteController.canCopy());
+            this.copyBodyPartBtn.tooltip(this.getBodyPartCopyLabel(), Direction.RIGHT);
+        }
+
+        if (this.pasteBodyPartBtn != null)
+        {
+            this.pasteBodyPartBtn.setEnabled(this.copyPasteController.canPaste());
+        }
+
+        if (this.removeBodyPartBtn != null)
+        {
+            this.removeBodyPartBtn.setEnabled(this.hasSelectedBodyParts());
+            this.removeBodyPartBtn.tooltip(this.getBodyPartRemoveLabel(), Direction.RIGHT);
+        }
+    }
+
+    /**
+     * Vertical split of the left column: tree fills all space when no body-part is selected;
+     * otherwise tree / body share {@link #outlinerSplitRatio} (default 50%).
+     */
+    private void updateLeftSplit()
+    {
+        boolean showBody = this.bodyPartEditor != null && this.bodyPartEditor.isVisible();
+
+        if (showBody)
+        {
+            this.outliner.h(this.outlinerSplitRatio);
+            this.outlinerSplitter.y(this.outlinerSplitRatio).setVisible(true);
+            this.bodyPartEditor.y(this.outlinerSplitRatio).h(1F - this.outlinerSplitRatio);
+        }
+        else
+        {
+            this.outliner.h(1F);
+
+            if (this.outlinerSplitter != null)
+            {
+                this.outlinerSplitter.setVisible(false);
+            }
+        }
+
+        this.forms.resize();
     }
 
     public void openFormList(Form current, Consumer<Form> callback)
@@ -509,7 +1722,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
         form = FormUtils.copy(form);
 
-        this.bodyPartEditor.setVisible(false);
+        this.setInspectorMode(InspectorMode.FORM);
 
         if (this.switchEditor(form))
         {
@@ -518,6 +1731,11 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
             if (this.statesEditor.isVisible())
             {
                 this.toggleStateEditor();
+            }
+
+            if (this.modelSettingsEditor.isVisible())
+            {
+                this.toggleModelEditor();
             }
 
             this.form = form;
@@ -544,6 +1762,12 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
             this.refreshFormList();
             this.formsList.setIndex(0);
 
+            /* Root form has no body-part — keep the lower half collapsed. */
+            this.bodyPartEditor.setVisible(false);
+            this.outlinerSplitter.setVisible(false);
+            this.updateLeftSplit();
+            this.updateBodyPartListButtons();
+
             this.form.clearStatePlayers();
 
             return true;
@@ -554,12 +1778,12 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
     public void undo()
     {
-        if (this.form != null && this.undoHandler.getUndoManager().undo(this.form)) UIUtils.playClick();
+        if (this.form != null && this.undoHandler.applyUndo(this.form)) UIUtils.playClick();
     }
 
     public void redo()
     {
-        if (this.form != null && this.undoHandler.getUndoManager().redo(this.form)) UIUtils.playClick();
+        if (this.form != null && this.undoHandler.applyRedo(this.form)) UIUtils.playClick();
     }
 
     public void refreshFormList()
@@ -593,9 +1817,49 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         this.editor.setEditor(this);
         this.editor.startEdit(form);
         this.editor.full(this.formEditor).resize();
+        this.updateModelEditorButton();
         this.refillState();
+        this.syncFormTransformGizmoForEditor();
 
         return true;
+    }
+
+    /**
+     * Forms without a pose editor (extruded, label, billboard, …) only expose a form-level
+     * transform. Enable that gizmo target as soon as their panel opens — otherwise the gizmo
+     * stays inert until the user visits the General tab once (which calls
+     * {@link #enableFormTransformGizmoFromGeneralPanel()}).
+     * <p>
+     * When the editor still supports pose, keep the user's current POSE/FORM choice across
+     * panel rebuilds (tree reselect, undo/redo). Only force FORM when pose is unavailable.
+     */
+    private void syncFormTransformGizmoForEditor()
+    {
+        if (this.supportsPoseGizmoTarget())
+        {
+            if (this.gizmoTarget == GizmoTarget.FORM)
+            {
+                this.enableFormTransformGizmoFromGeneralPanel();
+            }
+            else
+            {
+                this.gizmoTarget = GizmoTarget.POSE;
+
+                if (this.modelSettingsEditor != null)
+                {
+                    this.modelSettingsEditor.exitFormTransformGizmoMode();
+                }
+
+                this.refreshGizmoTargetButton();
+            }
+
+            return;
+        }
+
+        if (this.editor != null)
+        {
+            this.enableFormTransformGizmoFromGeneralPanel();
+        }
     }
 
     public Form finish()
@@ -618,6 +1882,11 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     @Override
     public void exit()
     {
+        if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            this.toggleModelEditor();
+        }
+
         this.callback = null;
 
         List<UIFormList> children = this.getChildren(UIFormList.class);
@@ -652,12 +1921,34 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     @Override
     public void applyAllUndoData(MapType data)
     {
-        if (this.editor != null && this.form != null)
+        this.applyUndoUIState(data);
+    }
+
+    /**
+     * Applies cached UI undo data, then restores sidebar scrolls and gizmo target so
+     * Ctrl+Z/Y does not yank the inspector viewport or reset POSE/FORM mode.
+     */
+    public void applyUndoUIState(MapType data)
+    {
+        SidebarScrollSnapshot scrolls = this.captureSidebarScrolls();
+        GizmoTarget preservedTarget = this.gizmoTarget;
+        UIElement root = this.getRoot();
+
+        if (root != null)
         {
-            this.switchEditor(this.form);
+            /* Use the base visitation path so this method is not re-entered via {@link #applyAllUndoData}. */
+            if (root == this)
+            {
+                super.applyAllUndoData(data);
+            }
+            else
+            {
+                root.applyAllUndoData(data);
+            }
         }
 
-        super.applyAllUndoData(data);
+        this.restoreSidebarScrolls(scrolls);
+        this.restoreGizmoTargetAfterUndo(preservedTarget);
     }
 
     @Override
@@ -667,15 +1958,114 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
 
         this.refreshFormList();
 
-        UIForms.FormEntry bodyPart = CollectionUtils.getSafe(this.formsList.getList(), data.getInt("body_part"));
-
-        if (bodyPart != null)
+        if (data.has("body_part"))
         {
-            this.formsList.setCurrentScroll(bodyPart);
-            this.pickForm(bodyPart);
+            int bodyPartIndex = data.getInt("body_part");
+            List<UIForms.FormEntry> list = this.formsList.getList();
+
+            if (bodyPartIndex >= 0 && bodyPartIndex < list.size())
+            {
+                UIForms.FormEntry bodyPart = list.get(bodyPartIndex);
+
+                this.formsList.setCurrentScroll(bodyPart);
+                this.pickForm(bodyPart);
+            }
+            else if (!list.isEmpty())
+            {
+                this.formsList.setIndex(Math.max(0, Math.min(bodyPartIndex, list.size() - 1)));
+                this.pickForm(this.formsList.getCurrentFirst());
+            }
         }
 
         this.refillState();
+    }
+
+    public boolean isApplyingUndo()
+    {
+        return this.undoHandler != null && this.undoHandler.isApplyingUndo();
+    }
+
+    private static final class SidebarScrollSnapshot
+    {
+        private final double formPanel;
+        private final double bodyPart;
+        private final double modelSections;
+        private final double modelRight;
+
+        private SidebarScrollSnapshot(double formPanel, double bodyPart, double modelSections, double modelRight)
+        {
+            this.formPanel = formPanel;
+            this.bodyPart = bodyPart;
+            this.modelSections = modelSections;
+            this.modelRight = modelRight;
+        }
+    }
+
+    private SidebarScrollSnapshot captureSidebarScrolls()
+    {
+        double formPanel = 0D;
+        double bodyPart = 0D;
+        double modelSections = 0D;
+        double modelRight = 0D;
+
+        if (this.editor != null && this.editor.view instanceof UIFormPanel<?> formPanelView && formPanelView.options != null)
+        {
+            formPanel = formPanelView.options.scroll.getScroll();
+        }
+
+        if (this.bodyPartEditor != null)
+        {
+            bodyPart = this.bodyPartEditor.scroll.getScroll();
+        }
+
+        if (this.modelSettingsEditor != null)
+        {
+            modelSections = this.modelSettingsEditor.getSectionsScroll();
+            modelRight = this.modelSettingsEditor.getRightScroll();
+        }
+
+        return new SidebarScrollSnapshot(formPanel, bodyPart, modelSections, modelRight);
+    }
+
+    private void restoreSidebarScrolls(SidebarScrollSnapshot scrolls)
+    {
+        if (scrolls == null)
+        {
+            return;
+        }
+
+        if (this.editor != null && this.editor.view instanceof UIFormPanel<?> formPanelView && formPanelView.options != null)
+        {
+            formPanelView.options.scroll.setScroll(scrolls.formPanel);
+        }
+
+        if (this.bodyPartEditor != null)
+        {
+            this.bodyPartEditor.scroll.setScroll(scrolls.bodyPart);
+        }
+
+        if (this.modelSettingsEditor != null)
+        {
+            this.modelSettingsEditor.setSectionsScroll(scrolls.modelSections);
+            this.modelSettingsEditor.setRightScroll(scrolls.modelRight);
+        }
+    }
+
+    private void restoreGizmoTargetAfterUndo(GizmoTarget preserved)
+    {
+        if (preserved == null)
+        {
+            return;
+        }
+
+        if (preserved == GizmoTarget.POSE && !this.supportsPoseGizmoTarget())
+        {
+            this.enableFormTransformGizmoFromGeneralPanel();
+
+            return;
+        }
+
+        this.setGizmoTarget(preserved);
     }
 
     public void preFormRender(UIContext context, Form form)
@@ -717,17 +2107,75 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
             this.undoHandler.submitUndo();
         }
 
+        this.tickDetachedGizmoDrag(context);
+
         super.render(context);
+    }
+
+    /**
+     * {@link UIPropTransform} advances gizmo drags from its own {@code render()}. When that
+     * widget is unmounted (FORM target / General closed) or mounted but not painted, drive
+     * the drag here so values still update. Skip when {@code render()} will tick to avoid
+     * double-advancing pointer deltas.
+     */
+    private void tickDetachedGizmoDrag(UIContext context)
+    {
+        UIPropTransform transform = this.getGizmoDragTransform();
+
+        if (transform == null || !transform.isGizmoEditing())
+        {
+            return;
+        }
+
+        if (transform.getRoot() != null && transform.canBeSeen() && transform.canBeRendered(context.getViewport()))
+        {
+            return;
+        }
+
+        transform.tickGizmoDrag(context);
     }
 
     public Matrix4f getOrigin(float transition)
     {
-        if (this.statesEditor.isVisible())
+        Matrix4f result = null;
+
+        if (this.gizmoTarget == GizmoTarget.FORM && this.editor != null && this.editor.form != null)
         {
-            return this.statesKeyframes.getOrigin(transition);
+            /* "#origin" makes UIForm.getOrigin() return the form's own pivot (entry.origin()),
+             * i.e. the point its own transform rotates/scales around, ignoring any pose bone -
+             * exactly the model's bottom/pivot the transform panel's numbers apply to. */
+            TransformOrientation orientation = this.editor.generalPanel != null ? this.editor.generalPanel.transform.getOrientation() : TransformOrientation.PARENT;
+            Matrix4f matrix = this.editor.getOrigin(transition, FormUtils.getPath(this.editor.form) + "#origin", orientation);
+
+            if (matrix != null && matrix != Matrices.EMPTY_4F)
+            {
+                Transform formTransform = this.editor.form.transform.get();
+                result = GizmoMatrixUtils.withLocalRotation(matrix, formTransform, orientation);
+            }
+            else
+            {
+                result = matrix;
+            }
+        }
+        else if (this.modelSettingsEditor != null && this.modelSettingsEditor.isVisible())
+        {
+            UIPoseEditor poseEditor = this.modelSettingsEditor.getPoseEditor();
+
+            if (this.editor instanceof UIModelForm modelForm)
+            {
+                result = modelForm.getOriginForPoseEditor(transition, poseEditor);
+            }
+        }
+        else if (this.statesEditor.isVisible())
+        {
+            result = this.statesKeyframes.getOrigin(transition);
+        }
+        else if (this.editor != null)
+        {
+            result = this.editor.getOrigin(transition);
         }
 
-        return this.editor.getOrigin(transition);
+        return GizmoMatrixUtils.normalizeBasis(result);
     }
 
     @Override

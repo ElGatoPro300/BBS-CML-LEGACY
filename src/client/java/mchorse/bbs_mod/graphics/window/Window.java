@@ -1,22 +1,51 @@
 package mchorse.bbs_mod.graphics.window;
 
+import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.data.DataToString;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
+import mchorse.bbs_mod.mixin.client.MouseAccessor;
+
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Mouse;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.util.InputUtil;
+
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Window
 {
     private static int verticalScroll;
     private static long lastScroll;
+    private static final Map<Integer, Long> standardCursors = new HashMap<>();
+    private static int currentCursorShape = -1;
+
+    private static MapType inMemoryClipboard;
+    private static String clipboardCache;
+    private static long clipboardCacheMs;
+    private static final long CLIPBOARD_CACHE_MS = 500L;
+
+    /**
+     * Suppress GLFW_FORMAT_UNAVAILABLE (65545) during clipboard
+     * reads so Windows non-text / locked clipboard does not spam "GL ERROR" via Minecraft's
+     * GLFW error callback. Other GLFW errors still print to stderr.
+     */
+    private static final GLFWErrorCallback clipboardErrorPrint = GLFWErrorCallback.createPrint(System.err);
+    private static final GLFWErrorCallback clipboardErrorCallback = GLFWErrorCallback.create((error, description) ->
+    {
+        if (error != GLFW.GLFW_FORMAT_UNAVAILABLE)
+        {
+            clipboardErrorPrint.invoke(error, description);
+        }
+    });
 
     public static long getWindow()
     {
@@ -66,40 +95,125 @@ public class Window
 
     public static String getClipboard()
     {
+        long now = System.currentTimeMillis();
+
+        /* Cache briefly so UI polls (button enable, keybinds) do not hammer the OS every frame. */
+        if (clipboardCache != null && now - clipboardCacheMs < CLIPBOARD_CACHE_MS)
+        {
+            return clipboardCache;
+        }
+
+        /* Install a local GLFW error filter for this read only. */
+        GLFWErrorCallback previous = GLFW.glfwSetErrorCallback(clipboardErrorCallback);
+
         try
         {
+            MinecraftClient client = MinecraftClient.getInstance();
+
+            if (client != null && client.keyboard != null)
+            {
+                return client.keyboard.getClipboard();
+            }
+
             String string = GLFW.glfwGetClipboardString(getWindow());
 
-            return string == null ? "" : string;
+            clipboardCache = string == null ? "" : string;
         }
         catch (Exception e)
-        {}
+        {
+            clipboardCache = "";
+        }
+        finally
+        {
+            GLFW.glfwSetErrorCallback(previous);
+        }
 
-        return "";
+        clipboardCacheMs = now;
+
+        return clipboardCache;
     }
 
     public static MapType getClipboardMap()
     {
-        return DataToString.mapFromString(getClipboard());
+        return parseClipboardMap(getClipboard());
     }
 
     /**
-     * Get a data map from clipboard with verification key.
+     * Get a data map from in-memory clipboard with verification key.
      */
     public static MapType getClipboardMap(String verificationKey)
     {
-        MapType data = DataToString.mapFromString(getClipboard());
+        /* Prefer in-session copy first — avoids OS clipboard polls for in-app paste checks. */
+        if (inMemoryClipboard != null && inMemoryClipboard.getBool(verificationKey))
+        {
+            return inMemoryClipboard;
+        }
+
+        if (BBSSettings.usingInMemoryClipboard.get())
+        {
+            return null;
+        }
+
+        MapType data = parseClipboardMap(getClipboard());
 
         return data != null && data.getBool(verificationKey) ? data : null;
     }
 
     public static ListType getClipboardList()
     {
-        return DataToString.listFromString(getClipboard());
+        String raw = getClipboard();
+
+        if (!looksLikeBbsList(raw))
+        {
+            return null;
+        }
+
+        return DataToString.listFromStringSilent(raw.trim());
+    }
+
+    /**
+     * Parse OS clipboard text as a BBS map without stderr spam. Rejects non-map payloads
+     * (plain text, log dumps, images-as-failed-string, etc.) before invoking the parser.
+     */
+    private static MapType parseClipboardMap(String raw)
+    {
+        if (!looksLikeBbsMap(raw))
+        {
+            return null;
+        }
+
+        return DataToString.mapFromStringSilent(raw.trim());
+    }
+
+    private static boolean looksLikeBbsMap(String raw)
+    {
+        if (raw == null || raw.isEmpty())
+        {
+            return false;
+        }
+
+        String trimmed = raw.trim();
+
+        return !trimmed.isEmpty() && trimmed.charAt(0) == '{';
+    }
+
+    private static boolean looksLikeBbsList(String raw)
+    {
+        if (raw == null || raw.isEmpty())
+        {
+            return false;
+        }
+
+        String trimmed = raw.trim();
+
+        return !trimmed.isEmpty() && trimmed.charAt(0) == '[';
     }
 
     public static void setClipboard(String string)
     {
+        clipboardCache = string == null ? "" : string;
+        clipboardCacheMs = System.currentTimeMillis();
+
         if (string.length() > 1024)
         {
             byte[] bytes = string.getBytes(StandardCharsets.UTF_8);
@@ -128,21 +242,106 @@ public class Window
     }
 
     /**
-     * Save given data to clipboard with a verification key that could be
+     * Save given data to in-memory clipboard with a verification key that could be
      * used in {@link #getClipboardMap(String)} to decode data.
      */
-    public static void setClipboard(MapType data, String verificationKey)
+    public static void setInMemoryClipboard(MapType data, String verificationKey)
     {
         if (data != null)
         {
             data.putBool(verificationKey, true);
-        }
+            inMemoryClipboard = data;
 
-        setClipboard(data);
+            if (!BBSSettings.usingInMemoryClipboard.get())
+            {
+                setClipboard(DataToString.toString(data, true));
+            }
+        }
     }
 
     public static void moveCursor(int x, int y)
     {
         GLFW.glfwSetCursorPos(getWindow(), x, y);
+    }
+
+    /**
+     * Center the OS/GLFW cursor and force-sync Minecraft {@link Mouse} to the same
+     * point (clearing accumulated cursor deltas). Actor-control / free-look read
+     * {@code Mouse.getX/Y()} for deltas; without this sync those values can still
+     * sit on a UI click for one or more frames after {@code glfwSetCursorPos}, which
+     * causes a yaw/pitch jump on the first real look movement.
+     */
+    public static void centerCursor()
+    {
+        net.minecraft.client.util.Window window = MinecraftClient.getInstance().getWindow();
+
+        if (window == null)
+        {
+            return;
+        }
+
+        double x = window.getWidth() / 2D;
+        double y = window.getHeight() / 2D;
+
+        moveCursor((int) x, (int) y);
+        syncClientMouseTo(x, y);
+    }
+
+    /**
+     * Align Minecraft's mouse absolute position with a GLFW warp and drop any
+     * pending look deltas from the UI→center transition.
+     */
+    public static void syncClientMouseTo(double x, double y)
+    {
+        Mouse mouse = MinecraftClient.getInstance().mouse;
+
+        if (!(mouse instanceof MouseAccessor accessor))
+        {
+            return;
+        }
+
+        accessor.bbs$setX(x);
+        accessor.bbs$setY(y);
+        accessor.bbs$setCursorDeltaX(0D);
+        accessor.bbs$setCursorDeltaY(0D);
+    }
+
+    /**
+     * Raw GLFW cursor position in window coordinates (same space as {@link #moveCursor}).
+     * Useful for one-shot warps / diagnostics. Do <b>not</b> use frame-to-frame differences
+     * for actor-control or free-look while {@code GLFW_CURSOR_DISABLED}: many platforms
+     * keep this value at the centered warp, so look deltas become zero. Prefer Minecraft
+     * {@code Mouse.getX/Y()} for continuous look deltas after {@link #centerCursor()}.
+     */
+    public static void getCursorPos(double[] x, double[] y)
+    {
+        GLFW.glfwGetCursorPos(getWindow(), x, y);
+    }
+
+    public static void setStandardCursor(int shape)
+    {
+        long window = getWindow();
+
+        if (GLFW.glfwGetInputMode(window, GLFW.GLFW_CURSOR) == GLFW.GLFW_CURSOR_DISABLED)
+        {
+            currentCursorShape = -1;
+
+            return;
+        }
+
+        if (currentCursorShape == shape)
+        {
+            return;
+        }
+
+        long cursor = standardCursors.computeIfAbsent(shape, GLFW::glfwCreateStandardCursor);
+
+        GLFW.glfwSetCursor(window, cursor);
+        currentCursorShape = shape;
+    }
+
+    public static void resetCursor()
+    {
+        setStandardCursor(GLFW.GLFW_ARROW_CURSOR);
     }
 }

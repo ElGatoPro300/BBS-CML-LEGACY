@@ -1,6 +1,7 @@
 package mchorse.bbs_mod;
 
 import mchorse.bbs_mod.utils.watchdog.WatchDog;
+
 import net.minecraft.client.MinecraftClient;
 
 import java.io.File;
@@ -36,6 +37,12 @@ public class BBSResources
             watchDog.stop();
             watchDog = null;
         }
+    }
+
+    public static void restartWatchdog()
+    {
+        stopWatchdog();
+        setupWatchdog();
     }
 
     public static void tick()

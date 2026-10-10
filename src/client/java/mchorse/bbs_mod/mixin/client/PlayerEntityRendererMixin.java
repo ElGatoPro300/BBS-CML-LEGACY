@@ -5,6 +5,7 @@ import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.renderers.FormRenderer;
 import mchorse.bbs_mod.morphing.Morph;
+
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -12,6 +13,7 @@ import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
+
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -33,6 +35,11 @@ public class PlayerEntityRendererMixin
     @Inject(method = "getPositionOffset", at = @At("HEAD"), cancellable = true)
     public void onPositionOffset(AbstractClientPlayerEntity abstractClientPlayerEntity, float f, CallbackInfoReturnable<Vec3d> info)
     {
+        if (abstractClientPlayerEntity.isSpectator())
+        {
+            return;
+        }
+
         Morph morph = Morph.getMorph(abstractClientPlayerEntity);
 
         if (morph != null && morph.getForm() != null)
@@ -44,6 +51,11 @@ public class PlayerEntityRendererMixin
     @Inject(method = "renderArm", at = @At("HEAD"), cancellable = true)
     public void onRenderArmBegin(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, AbstractClientPlayerEntity player, ModelPart arm, ModelPart sleeve, CallbackInfo info)
     {
+        if (player.isSpectator())
+        {
+            return;
+        }
+
         Morph morph = Morph.getMorph(player);
 
         if (morph != null)

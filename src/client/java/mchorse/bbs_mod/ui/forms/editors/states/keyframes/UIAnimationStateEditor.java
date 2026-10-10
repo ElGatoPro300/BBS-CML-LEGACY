@@ -9,94 +9,99 @@ import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.ModelForm;
 import mchorse.bbs_mod.forms.renderers.ModelFormRenderer;
 import mchorse.bbs_mod.forms.renderers.utils.MatrixCache;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCacheEntry;
 import mchorse.bbs_mod.forms.states.AnimationState;
 import mchorse.bbs_mod.graphics.window.Window;
-import mchorse.bbs_mod.settings.values.base.BaseValueBasic;
+import mchorse.bbs_mod.settings.values.IValueListener;
+import mchorse.bbs_mod.settings.values.base.BaseValue;
 import mchorse.bbs_mod.ui.UIKeys;
-import mchorse.bbs_mod.ui.film.replays.UIReplaysEditor;
 import mchorse.bbs_mod.ui.film.replays.UIReplaysEditorUtils;
 import mchorse.bbs_mod.ui.film.replays.overlays.UIAnimationToPoseOverlayPanel;
 import mchorse.bbs_mod.ui.film.replays.overlays.UIKeyframeSheetFilterOverlayPanel;
 import mchorse.bbs_mod.ui.forms.editors.UIFormEditor;
+import mchorse.bbs_mod.ui.forms.editors.utils.UIFormPropertyTrackSheets;
+import mchorse.bbs_mod.ui.forms.editors.utils.UIPickableFormRenderer;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
+import mchorse.bbs_mod.ui.framework.elements.input.UIPropTransform;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframes;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.UIKeyframeDopeSheet;
 import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlay;
 import mchorse.bbs_mod.ui.framework.elements.utils.UIDraggable;
-import mchorse.bbs_mod.ui.utils.Gizmo;
 import mchorse.bbs_mod.ui.utils.StencilFormFramebuffer;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoController;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoMatrixUtils;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoRayFrame;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoSurface;
+import mchorse.bbs_mod.ui.utils.gizmo.TransformOrientation;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
+import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.Pair;
 import mchorse.bbs_mod.utils.StringUtils;
 import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.joml.Matrices;
+import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
+import mchorse.bbs_mod.utils.pose.Pose;
+import mchorse.bbs_mod.utils.pose.PoseTransform;
+import mchorse.bbs_mod.utils.pose.Transform;
+
 import org.joml.Matrix4f;
-import org.joml.Vector2i;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Set;
 
-public class UIAnimationStateEditor extends UIElement
+public class UIAnimationStateEditor extends UIElement implements GizmoSurface
 {
     public UIKeyframeEditor keyframeEditor;
 
+    private final GizmoController gizmoController = new GizmoController(this);
+    private StencilFormFramebuffer gizmoStencil;
+
     public UIFormEditor editor;
-    public UIElement editArea;
+    public UIDraggable draggable;
 
     private AnimationState state;
     private Set<String> keys = new LinkedHashSet<>();
+    private final Map<String, Boolean> collapsedModelTracks = new HashMap<>();
 
     public UIAnimationStateEditor(UIFormEditor editor)
     {
         this.editor = editor;
 
-        this.editArea = new UIElement();
-        this.editArea.relative(this)
-            .x(BBSSettings.editorLayoutSettings.getStateEditorSizeH())
-            .wTo(this.area, 1F)
-            .h(1F);
-
-        UIDraggable draggable = new UIDraggable((context) ->
+        this.draggable = new UIDraggable((context) ->
         {
-            float fx = (context.mouseX - this.area.x) / (float) this.area.w;
-            float fy = -(context.mouseY - this.getParent().area.ey()) / (float) this.getParent().area.h;
+            float fy = -(context.mouseY - this.editor.area.ey()) / (float) this.editor.area.h;
 
-            BBSSettings.editorLayoutSettings.setStateEditorSizeV(fy);
-            BBSSettings.editorLayoutSettings.setStateEditorSizeH(fx);
+            int minViewportH = 120;
+            float maxFy = this.editor.area.h > 0 ? (this.editor.area.h - minViewportH) / (float) this.editor.area.h : 0.75F;
+            float clamped = MathUtils.clamp(fy, 0.15F, Math.min(0.75F, maxFy));
 
-            this.h(BBSSettings.editorLayoutSettings.getStateEditorSizeV());
-            this.editArea.x(BBSSettings.editorLayoutSettings.getStateEditorSizeH());
-            this.getParent().resize();
+            BBSSettings.editorLayoutSettings.setStateEditorSizeV(clamped);
+
+            this.editor.updateStatesEditorLayout();
+            this.editor.resize();
         });
 
-        draggable.reference(() -> new Vector2i(this.editArea.area.x, this.area.y));
-        draggable.rendering((context) ->
+        this.draggable.rendering((context) ->
         {
-            int size = 5;
-            int x = this.editArea.area.x + 3;
-            int y = this.editArea.area.y + 3;
+            int mx = this.area.mx();
+            int y = this.area.y;
 
-            context.batcher.box(x, y, x + 1, y + size, Colors.WHITE);
-            context.batcher.box(x, y - 1, x + size, y, Colors.WHITE);
-
-            x = this.editArea.area.x - 3;
-            y = this.editArea.area.y + 3;
-
-            context.batcher.box(x - 1, y, x, y + size, Colors.WHITE);
-            context.batcher.box(x - size, y - 1, x, y, Colors.WHITE);
+            context.batcher.box(mx - 20, y, mx + 20, y + 2, Colors.WHITE);
         });
 
-        draggable.hoverOnly().relative(this.editArea).w(40).h(6).anchorX(0.5F);
+        this.draggable.hoverOnly().relative(this).x(0.5F).y(0).w(80).h(6).anchor(0.5F, 0.5F);
 
-        this.add(this.editArea, draggable);
+        this.add(this.draggable);
     }
 
     public AnimationState getState()
@@ -123,65 +128,30 @@ public class UIAnimationStateEditor extends UIElement
             return;
         }
 
-        List<UIKeyframeSheet> sheets = new ArrayList<>();
-
-        /* Form properties */
-        for (String key : FormUtils.collectPropertyPaths(this.editor.form))
-        {
-            KeyframeChannel property = this.state.properties.getOrCreate(this.editor.form, key);
-
-            if (property != null)
-            {
-                BaseValueBasic formProperty = FormUtils.getProperty(this.editor.form, key);
-                UIKeyframeSheet sheet = new UIKeyframeSheet(UIReplaysEditor.getColor(key), false, property, formProperty);
-
-                sheets.add(sheet.icon(UIReplaysEditor.getIcon(key)));
-            }
-        }
+        List<UIKeyframeSheet> sheets = UIFormPropertyTrackSheets.buildAnimationStateSheets(
+            this.editor.form,
+            this.state.properties,
+            this.collapsedModelTracks,
+            () -> this.setState(this.state),
+            "animation_state"
+        );
 
         this.keys.clear();
 
         for (UIKeyframeSheet sheet : sheets)
         {
-            this.keys.add(StringUtils.fileName(sheet.id));
-        }
-
-        sheets.removeIf((v) ->
-        {
-            if (v.id.equals("anchor"))
+            if (!sheet.groupHeader)
             {
-                return true;
+                this.keys.add(StringUtils.fileName(sheet.id));
             }
-
-            for (String s : BBSSettings.disabledSheets.get())
-            {
-                if (v.id.equals(s) || v.id.endsWith("/" + s))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        });
-
-        Object lastForm = null;
-
-        for (UIKeyframeSheet sheet : sheets)
-        {
-            Object form = sheet.property == null ? null : FormUtils.getForm(sheet.property);
-
-            if (!Objects.equals(lastForm, form))
-            {
-                sheet.separator = true;
-            }
-
-            lastForm = form;
         }
 
         if (!sheets.isEmpty())
         {
-            this.keyframeEditor = new UIKeyframeEditor((consumer) -> new UIAnimationStateKeyframes(this.editor, consumer)).target(this.editArea);
-            this.keyframeEditor.relative(this).h(1F).wTo(this.editArea.area);
+            this.keyframeEditor = new UIKeyframeEditor((consumer) -> new UIAnimationStateKeyframes(this.editor, consumer))
+                .target(this.editor.keyframeEditorContainer)
+                .pickListener(() -> this.editor.setInspectorMode(UIFormEditor.InspectorMode.KEYFRAME));
+            this.keyframeEditor.relative(this).full(this);
             this.keyframeEditor.setUndoId("form_animation_state_keyframe_editor");
 
             /* Reset */
@@ -193,32 +163,48 @@ public class UIAnimationStateEditor extends UIElement
             this.keyframeEditor.view.duration(() -> this.state.duration.get());
             this.keyframeEditor.view.context((menu) ->
             {
-                if (this.editor.form instanceof ModelForm modelForm)
+                int mouseY = this.getContext().mouseY;
+                UIKeyframeSheet sheet = this.keyframeEditor.view.getGraph().getSheet(mouseY);
+
+                if (sheet != null && sheet.channel.getFactory() == KeyframeFactories.POSE)
                 {
-                    int mouseY = this.getContext().mouseY;
-                    UIKeyframeSheet sheet = this.keyframeEditor.view.getGraph().getSheet(mouseY);
+                    String trackName = StringUtils.fileName(sheet.id);
 
-                    if (sheet != null && sheet.channel.getFactory() == KeyframeFactories.POSE && sheet.id.equals("pose"))
+                    if (trackName.equals("pose") || trackName.startsWith("pose_overlay"))
                     {
-                        menu.action(Icons.POSE, UIKeys.FILM_REPLAY_CONTEXT_ANIMATION_TO_KEYFRAMES, () ->
+                        Form form = sheet.property != null ? FormUtils.getForm(sheet.property) : this.editor.form;
+
+                        if (form instanceof ModelForm modelForm)
                         {
-                            ModelInstance model = ModelFormRenderer.getModel(modelForm);
-
-                            if (model != null)
+                            menu.action(Icons.POSE, UIKeys.FILM_REPLAY_CONTEXT_ANIMATION_TO_KEYFRAMES, () ->
                             {
-                                UIOverlay.addOverlay(this.getContext(), new UIAnimationToPoseOverlayPanel((animationKey, onlyKeyframes, length, step) ->
-                                {
-                                    int current = this.editor.getCursor();
-                                    IEntity entity = this.editor.renderer.getTargetEntity();
+                                ModelInstance model = ModelFormRenderer.getModel(modelForm);
 
-                                    UIReplaysEditorUtils.animationToPoseKeyframes(this.keyframeEditor, sheet, modelForm, entity, current, animationKey, onlyKeyframes, length, step);
-                                }, modelForm, sheet), 200, 197);
-                            }
+                                if (model != null)
+                                {
+                                    UIOverlay.addOverlay(this.getContext(), new UIAnimationToPoseOverlayPanel((animationKey, onlyKeyframes, length, step) ->
+                                    {
+                                        int current = this.editor.getCursor();
+                                        IEntity entity = this.editor.renderer.getTargetEntity();
+
+                                        UIReplaysEditorUtils.animationToPoseKeyframes(this.keyframeEditor, sheet, modelForm, entity, current, animationKey, onlyKeyframes, length, step);
+                                    }, modelForm, sheet), 260, 260);
+                                }
+                            });
+                        }
+                        menu.action(Icons.CONVERT, UIKeys.FILM_REPLAY_CONTEXT_POSE_TO_LIMBS, () -> this.convertToLimbs(sheet));
+                    }
+                    else if (sheet.id.indexOf(':') != -1)
+                    {
+                        menu.action(Icons.REMOVE, UIKeys.KEYFRAMES_CONTEXT_REMOVE, () ->
+                        {
+                            this.keyframeEditor.view.getGraph().removeKeyframe(this.keyframeEditor.view.getGraph().getSelected());
+                            this.setState(this.state);
                         });
                     }
                 }
 
-                if (this.keyframeEditor.view.getGraph() instanceof UIKeyframeDopeSheet)
+                if (this.keyframeEditor.view.getGraph() instanceof UIKeyframeDopeSheet && (sheet == null || !sheet.groupHeader))
                 {
                     menu.action(Icons.FILTER, UIKeys.FILM_REPLAY_FILTER_SHEETS, () ->
                     {
@@ -240,7 +226,7 @@ public class UIAnimationStateEditor extends UIElement
                 this.keyframeEditor.view.addSheet(sheet);
             }
 
-            this.addAfter(this.editArea, this.keyframeEditor);
+            this.prepend(this.keyframeEditor);
         }
 
         this.resize();
@@ -253,21 +239,29 @@ public class UIAnimationStateEditor extends UIElement
 
     public boolean clickViewport(UIContext context, StencilFormFramebuffer stencil)
     {
+        this.gizmoStencil = stencil;
+
+        UIPropTransform editableTransform = UIReplaysEditorUtils.getEditableTransform(this.keyframeEditor);
+
+        if (context.mouseButton == 0 && this.gizmoController.tryStartHandleDrag(context, editableTransform))
+        {
+            return true;
+        }
+
         if (stencil.hasPicked() && this.state != null)
         {
             Pair<Form, String> pair = stencil.getPicked();
 
             if (pair != null && context.mouseButton < 2)
             {
-                if (Gizmo.INSTANCE.start(stencil.getIndex(), context.mouseX, context.mouseY, UIReplaysEditorUtils.getEditableTransform(this.keyframeEditor)))
+                if (pair.a == null)
                 {
-                    return true;
+                    return false;
                 }
 
                 if (context.mouseButton == 0)
                 {
-                    if (Window.isCtrlPressed()) UIReplaysEditorUtils.offerAdjacent(this.getContext(), pair.a, pair.b, (bone) -> this.pickForm(pair.a, bone));
-                    else if (Window.isShiftPressed()) UIReplaysEditorUtils.offerHierarchy(this.getContext(), pair.a, pair.b, (bone) -> this.pickForm(pair.a, bone));
+                    if (Window.isShiftPressed()) UIReplaysEditorUtils.offerHierarchy(this.getContext(), pair.a, pair.b, (bone) -> this.pickForm(pair.a, bone));
                     else this.pickForm(pair.a, pair.b);
 
                     return true;
@@ -282,6 +276,66 @@ public class UIAnimationStateEditor extends UIElement
         }
 
         return false;
+    }
+
+    public void finishGizmoPendingClick()
+    {
+        Pair<Form, String> pendingPick = this.gizmoController.consumePendingTrackballClick();
+
+        if (pendingPick != null && pendingPick.a != null)
+        {
+            if (Window.isShiftPressed())
+            {
+                UIReplaysEditorUtils.offerHierarchy(this.getContext(), pendingPick.a, pendingPick.b, (bone) -> this.pickForm(pendingPick.a, bone));
+            }
+            else
+            {
+                this.pickForm(pendingPick.a, pendingPick.b);
+            }
+        }
+
+        this.gizmoController.stop();
+    }
+
+    @Override
+    public StencilFormFramebuffer getGizmoStencil()
+    {
+        return this.gizmoStencil;
+    }
+
+    @Override
+    public void prepareGizmoDrag(UIPropTransform transform)
+    {
+        if (transform == null || this.editor == null || this.editor.renderer == null)
+        {
+            return;
+        }
+
+        UIPickableFormRenderer renderer = this.editor.renderer;
+        UIAnimationStateEditor self = this;
+
+        transform.setGizmoRayProvider(GizmoRayFrame.fromCamera(
+            renderer.camera,
+            renderer.area,
+            () ->
+            {
+                UIContext context = self.getContext();
+
+                if (context == null)
+                {
+                    return null;
+                }
+
+                Matrix4f origin = self.getOrigin(context.getTransition());
+
+                if (origin == null || origin == Matrices.EMPTY_4F)
+                {
+                    return null;
+                }
+
+                return origin;
+            }
+        ));
     }
 
     public void pickForm(Form form, String bone)
@@ -301,7 +355,7 @@ public class UIAnimationStateEditor extends UIElement
             return Matrices.EMPTY_4F;
         }
 
-        Pair<String, Boolean> bone = this.keyframeEditor.getBone();
+        Pair<String, TransformOrientation> bone = this.keyframeEditor.getBone();
 
         if (bone == null)
         {
@@ -310,19 +364,119 @@ public class UIAnimationStateEditor extends UIElement
 
         Form root = FormUtils.getRoot(this.editor.form);
         MatrixCache map = FormUtilsClient.getRenderer(root).collectMatrices(this.editor.renderer.getTargetEntity(), transition);
-        Matrix4f matrix = bone.b ? map.get(bone.a).origin() : map.get(bone.a).matrix();
+        
+        String key = bone.a;
+        boolean forceOrigin = key.endsWith("#origin");
+        
+        if (forceOrigin) key = key.substring(0, key.length() - 7);
+        
+        MatrixCacheEntry entry = map.get(key);
+        
+        if (entry == null)
+        {
+            return Matrices.EMPTY_4F;
+        }
+
+        if (forceOrigin)
+        {
+            Matrix4f matrix = entry.origin();
+
+            return matrix == null ? Matrices.EMPTY_4F : matrix;
+        }
+
+        boolean bobj = root instanceof ModelForm modelForm && ModelFormRenderer.isBobjModel(modelForm);
+        Matrix4f matrix = GizmoMatrixUtils.resolveFilmPoseBoneMatrix(entry, bone.b, bobj);
 
         return matrix == null ? Matrices.EMPTY_4F : matrix;
+    }
+
+    private void convertToLimbs(UIKeyframeSheet sheet)
+    {
+        List<Keyframe> selected = new ArrayList<>(sheet.selection.getSelected());
+
+        if (selected.isEmpty())
+        {
+            return;
+        }
+
+        Form rootForm = FormUtils.getRoot(this.editor.form);
+
+        Set<String> boneNames = new HashSet<>();
+
+        for (Keyframe kf : selected)
+        {
+            Pose pose = (Pose) kf.getValue();
+
+            if (pose != null)
+            {
+                boneNames.addAll(pose.transforms.keySet());
+            }
+        }
+
+        BaseValue.edit(this.state, IValueListener.FLAG_UNMERGEABLE, (s) ->
+        {
+            Set<Float> convertedTicks = new HashSet<>();
+
+            for (Keyframe kf : selected)
+            {
+                Pose pose = (Pose) sheet.channel.interpolate(kf.getTick());
+
+                if (pose == null)
+                {
+                    continue;
+                }
+
+                convertedTicks.add(kf.getTick());
+
+                for (String boneName : boneNames)
+                {
+                    PoseTransform transform = pose.transforms.get(boneName);
+
+                    if (transform == null)
+                    {
+                        transform = new PoseTransform();
+                    }
+
+                    String key = sheet.id + ":" + boneName;
+
+                    KeyframeChannel<Transform> channel = this.state.properties.getOrCreate(rootForm, key);
+
+                    if (channel != null)
+                    {
+                        int index = channel.insert(kf.getTick(), transform.copy());
+                        Keyframe<Transform> newKf = channel.get(index);
+
+                        newKf.copyOverExtra(kf);
+                    }
+                }
+            }
+
+            if (!convertedTicks.isEmpty())
+            {
+                for (int i = sheet.channel.getList().size() - 1; i >= 0; i--)
+                {
+                    Keyframe existing = (Keyframe) sheet.channel.getList().get(i);
+
+                    for (Float tick : convertedTicks)
+                    {
+                        if (Math.abs(existing.getTick() - tick) < 0.0001F)
+                        {
+                            sheet.channel.remove(i);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            this.state.properties.cleanUp();
+        });
+
+        this.setState(this.state);
     }
 
     @Override
     public void render(UIContext context)
     {
-        if (this.keyframeEditor != null)
-        {
-            this.editArea.area.render(context.batcher, Colors.A75);
-        }
-
         super.render(context);
     }
 }

@@ -5,6 +5,7 @@ import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.renderers.utils.MatrixCache;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCacheEntry;
 import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
@@ -15,12 +16,15 @@ import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.UIPanelBase;
 import mchorse.bbs_mod.ui.framework.elements.input.UIPropTransform;
 import mchorse.bbs_mod.ui.utils.UIUtils;
+import mchorse.bbs_mod.ui.utils.gizmo.GizmoMatrixUtils;
+import mchorse.bbs_mod.ui.utils.gizmo.TransformOrientation;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.Direction;
 import mchorse.bbs_mod.utils.MathUtils;
-import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.joml.Matrices;
+
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>>
 {
@@ -36,13 +40,22 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     {
         super(Direction.LEFT);
 
-        this.keys().register(Keys.FILM_CONTROLLER_CYCLE_EDITORS, this::cyclePanels);
+        this.keys().register(Keys.FILM_CONTROLLER_CYCLE_EDITORS, this::cyclePanels).allowShift();
+    }
+
+    @Override
+    public void setPanel(UIFormPanel<T> panel)
+    {
+        super.setPanel(panel);
+
+        if (panel == this.generalPanel && this.editor != null && !this.editor.isApplyingUndo())
+        {
+            this.editor.enableFormTransformGizmoFromGeneralPanel();
+        }
     }
 
     public UIPropTransform getEditableTransform()
     {
-        this.setPanel(this.generalPanel);
-
         return this.general;
     }
 
@@ -57,14 +70,67 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
 
     public Matrix4f getOrigin(float transition)
     {
-        return this.getOrigin(transition, FormUtils.getPath(this.form), this.generalPanel != null && this.generalPanel.transform.isLocal());
+        TransformOrientation orientation = this.generalPanel != null ? this.generalPanel.transform.getOrientation() : TransformOrientation.PARENT;
+
+        return this.getOrigin(transition, FormUtils.getPath(this.form), orientation);
     }
 
-    protected Matrix4f getOrigin(float transition, String path, boolean local)
+    public Matrix4f getOrigin(float transition, String path, boolean local)
     {
+        return this.getOrigin(transition, path, local ? TransformOrientation.LOCAL : TransformOrientation.PARENT);
+    }
+
+    public Matrix4f getOrigin(float transition, String path, TransformOrientation orientation)
+    {
+        if (path == null)
+        {
+            return Matrices.EMPTY_4F;
+        }
+
         Form root = FormUtils.getRoot(this.form);
         MatrixCache map = FormUtilsClient.getRenderer(root).collectMatrices(this.editor.renderer.getTargetEntity(), transition);
-        Matrix4f matrix = local ? map.get(path).matrix() : map.get(path).origin();
+        
+        boolean forceOrigin = path.endsWith("#origin");
+        
+        if (forceOrigin) path = path.substring(0, path.length() - 7);
+        
+        MatrixCacheEntry entry = map.get(path);
+
+        if (entry == null)
+        {
+            return Matrices.EMPTY_4F;
+        }
+
+        Matrix4f matrix;
+        boolean local = orientation != null && orientation.usesLocalBoneBasis();
+
+        if (forceOrigin)
+        {
+            matrix = entry.origin();
+        }
+        else if (local)
+        {
+            Matrix4f localMatrix = entry.matrix();
+            Matrix4f originMatrix = entry.origin();
+
+            if (localMatrix != null && originMatrix != null)
+            {
+                matrix = new Matrix4f(localMatrix);
+                matrix.setTranslation(originMatrix.getTranslation(new Vector3f()));
+            }
+            else
+            {
+                matrix = localMatrix != null ? localMatrix : originMatrix;
+            }
+        }
+        else
+        {
+            matrix = entry.origin();
+        }
+
+        matrix = matrix == null ? null : new Matrix4f(matrix);
+        matrix = GizmoMatrixUtils.applyOrientationSpace(matrix, orientation);
+        matrix = GizmoMatrixUtils.normalizeBasis(matrix);
 
         return matrix == null ? Matrices.EMPTY_4F : matrix;
     }
@@ -88,12 +154,12 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     {
         this.form = form;
 
+        this.setPanel(this.defaultPanel);
+
         for (UIFormPanel<T> panel : this.panels)
         {
             panel.startEdit(form);
         }
-
-        this.setPanel(this.defaultPanel);
     }
 
     public void finishEdit()
@@ -115,7 +181,8 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     @Override
     protected void renderBackground(UIContext context, int x, int y, int w, int h)
     {
-        context.batcher.box(x, y, x + w, y + h, Colors.A100);
+        context.batcher.box(x, y, x + w, y + h, 0xFF161719);
+        context.batcher.box(x + w - 1, y, x + w, y + h, 0xFF2A2B2F);
     }
 
     @Override
@@ -123,8 +190,10 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     {
         super.collectUndoData(data);
 
-        data.putInt("panel", this.panels.indexOf(this.view));
-        data.putDouble("scroll", this.view.options.scroll.getScroll());
+        int panelIndex = this.panels.indexOf(this.view);
+        data.putInt("panel", panelIndex);
+        /* Scroll is intentionally not snapshotted: undo/redo must not yank the inspector
+         * viewport back to an older offset while the user is still reading the panel. */
     }
 
     @Override
@@ -132,7 +201,21 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     {
         super.applyUndoData(data);
 
-        this.setPanel(this.panels.get(data.getInt("panel")));
-        this.view.options.scroll.setScroll(data.getDouble("scroll"));
+        int panelIndex = data.getInt("panel");
+        UIFormPanel<T> next = null;
+
+        if (panelIndex >= 0 && panelIndex < this.panels.size())
+        {
+            next = this.panels.get(panelIndex);
+        }
+        else
+        {
+            next = this.defaultPanel;
+        }
+
+        if (next != null && next != this.view)
+        {
+            this.setPanel(next);
+        }
     }
 }
