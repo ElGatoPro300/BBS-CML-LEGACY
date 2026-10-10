@@ -15,6 +15,7 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.property.Properties;
 import net.minecraft.structure.StructurePlacementData;
@@ -71,7 +72,7 @@ public class StructurePickerExporter
             NbtCompound nbt = new NbtCompound();
 
             template.writeNbt(nbt);
-            NbtIo.writeCompressed(nbt, file);
+            NbtIo.writeCompressed(nbt, file.toPath());
         }
         catch (IOException e)
         {
@@ -128,7 +129,7 @@ public class StructurePickerExporter
             NbtCompound nbt = new NbtCompound();
 
             template.writeNbt(nbt);
-            NbtIo.writeCompressed(nbt, file);
+            NbtIo.writeCompressed(nbt, file.toPath());
         }
         catch (IOException e)
         {
@@ -518,7 +519,7 @@ public class StructurePickerExporter
         {
             if (file != null && file.exists())
             {
-                return NbtIo.readCompressed(file);
+                return NbtIo.readCompressed(file.toPath(), NbtSizeTracker.ofUnlimitedBytes());
             }
 
             try (InputStream stream = BBSMod.getProvider().getAsset(link))
@@ -528,7 +529,7 @@ public class StructurePickerExporter
                     return null;
                 }
 
-                return NbtIo.readCompressed(stream);
+                return NbtIo.readCompressed(stream, NbtSizeTracker.ofUnlimitedBytes());
             }
         }
         catch (IOException e)

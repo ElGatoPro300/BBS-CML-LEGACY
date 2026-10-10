@@ -108,13 +108,6 @@ public class Window
 
         try
         {
-            MinecraftClient client = MinecraftClient.getInstance();
-
-            if (client != null && client.keyboard != null)
-            {
-                return client.keyboard.getClipboard();
-            }
-
             String string = GLFW.glfwGetClipboardString(getWindow());
 
             clipboardCache = string == null ? "" : string;
