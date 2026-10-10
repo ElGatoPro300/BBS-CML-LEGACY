@@ -234,7 +234,7 @@ public class FormOutlineRenderer
             RenderSystem.disableCull();
 
             RenderSystem.setShaderTexture(0, maskTexture.id);
-            RenderSystem.setShader(BBSShaders::getOutlineDilateH);
+            RenderSystem.setShader(BBSShaders.getOutlineDilateH());
 
             GlUniform hTexelUniform = dilateShader.getUniform("TexelSize");
             GlUniform hThicknessUniform = dilateShader.getUniform("Thickness");
@@ -268,7 +268,7 @@ public class FormOutlineRenderer
 
             RenderSystem.setShaderTexture(0, dilateTexture.id);
             RenderSystem.setShaderTexture(1, maskTexture.id);
-            RenderSystem.setShader(BBSShaders::getOutlineComposite);
+            RenderSystem.setShader(BBSShaders.getOutlineComposite());
 
             GlUniform texelUniform = compositeShader.getUniform("TexelSize");
             GlUniform thicknessUniform = compositeShader.getUniform("Thickness");

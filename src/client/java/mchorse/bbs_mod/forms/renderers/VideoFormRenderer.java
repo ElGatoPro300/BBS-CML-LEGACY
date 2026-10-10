@@ -31,6 +31,7 @@ import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
@@ -50,7 +51,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import org.lwjgl.opengl.GL11;
 
 import java.io.File;
-import java.util.function.Supplier;
 
 /**
  * VideoForm quad powered by {@link VideoFormEngine} (async scaled ffmpeg).
@@ -187,9 +187,9 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             context.stack.peek().getNormalMatrix().identity();
         }
 
-        /* Must match picker_billboard_no_shading (POSITION_TEXTURE_LIGHT_COLOR). */
-        Supplier<ShaderProgram> pickShader = this.getShader(context,
-            GameRenderer::getPositionTexColorProgram, BBSShaders::getPickerBillboardNoShadingProgram);
+        ShaderProgram pickShader = BBSShaders.getPickerBillboardNoShadingProgram();
+
+        this.setupTarget(context, pickShader);
         Matrix4f positionMatrix = new Matrix4f(context.stack.peek().getPositionMatrix());
         Quad localQuad = new Quad();
 
@@ -644,10 +644,15 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         int lightSnapshot = deferContext != null ? deferContext.light : LightmapTextureManager.MAX_LIGHT_COORDINATE;
         int overlaySnapshot = deferContext != null ? deferContext.overlay : OverlayTexture.DEFAULT_UV;
         boolean guiPass = isGuiVideoPass(deferContext);
-        Supplier<ShaderProgram> pickShader = picking
-            ? this.getShader(deferContext, GameRenderer::getPositionTexColorProgram, BBSShaders::getPickerBillboardNoShadingProgram)
-            : null;
+        ShaderProgram pickShader = null;
 
+        if (picking)
+        {
+            pickShader = BBSShaders.getPickerBillboardNoShadingProgram();
+            this.setupTarget(deferContext, pickShader);
+        }
+
+        ShaderProgram finalPickShader = pickShader;
         Runnable draw = () ->
         {
             if (textureIdSnapshot > 0 && !picking)
@@ -655,9 +660,9 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
                 this.drawVideoFront(positionMatrix, tintSnapshot, localQuad, textureIdSnapshot, linear, true,
                     lightSnapshot, overlaySnapshot, guiPass);
             }
-            else if (picking && pickShader != null)
+            else if (picking && finalPickShader != null)
             {
-                this.drawPickFront(positionMatrix, localQuad, pickShader,
+                this.drawPickFront(positionMatrix, localQuad, finalPickShader,
                     textureIdSnapshot > 0 ? textureIdSnapshot : this.resolvePickTextureId());
             }
             else if (staticPreview)
@@ -666,7 +671,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
                 Color placeholder = Color.rgba(PLACEHOLDER_COLOR);
 
                 placeholder.a = tintSnapshot.a;
-                this.drawSolidFront(positionMatrix, placeholder, localQuad, GameRenderer::getPositionColorProgram);
+                this.drawSolidFront(positionMatrix, placeholder, localQuad, null);
             }
         };
 
@@ -927,15 +932,11 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         int light, int overlay)
     {
         GameRenderer gameRenderer = MinecraftClient.getInstance().gameRenderer;
-        boolean softForm = !depthWrite || tint.a < ShaderOpacityPatch.LIVE_DEPTH_WRITE_ALPHA;
-        Supplier<ShaderProgram> shader = softForm
-            ? GameRenderer::getRenderTypeEntityTranslucentProgram
-            : GameRenderer::getRenderTypeEntityCutoutNoNullProgram;
 
         gameRenderer.getLightmapTextureManager().enable();
         gameRenderer.getOverlayTexture().setupOverlayColor();
 
-        RenderSystem.setShader(shader);
+        RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
         RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
         RenderSystem.setShaderTexture(0, textureId);
         RenderSystem.enableBlend();
@@ -968,11 +969,15 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
     private void drawVideoFrontBbs(Matrix4f matrix, Color tint, Quad quad, int textureId, boolean depthWrite)
     {
         ShaderProgram videoProgram = BBSShaders.getVideoProgram();
-        Supplier<ShaderProgram> shaderSupplier = videoProgram != null
-            ? () -> videoProgram
-            : GameRenderer::getPositionTexProgram;
 
-        RenderSystem.setShader(shaderSupplier);
+        if (videoProgram != null)
+        {
+            RenderSystem.setShader(videoProgram);
+        }
+        else
+        {
+            RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
+        }
         RenderSystem.setShaderColor(tint.r, tint.g, tint.b, tint.a);
         RenderSystem.setShaderTexture(0, textureId);
 
@@ -1047,7 +1052,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
      * so Alt multi-replay pick does not inherit the previous form's albedo. Prefer the video's
      * last frame so {@code picker_billboard_no_shading} discards fully transparent pixels.
      */
-    private void drawPickFront(Matrix4f matrix, Quad quad, Supplier<ShaderProgram> shader, int textureId)
+    private void drawPickFront(Matrix4f matrix, Quad quad, ShaderProgram shader, int textureId)
     {
         if (textureId <= 0)
         {
@@ -1105,14 +1110,22 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         buffer.vertex(matrix, x, y, z).texture(u, v).light(light).color(color.r, color.g, color.b, color.a);
     }
 
-    private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, Supplier<ShaderProgram> shader)
+    private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, ShaderProgram shader)
     {
         boolean previousCull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
         boolean previousDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
 
         try
         {
-            RenderSystem.setShader(shader);
+            if (shader != null)
+            {
+                RenderSystem.setShader(shader);
+            }
+            else
+            {
+                RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+            }
+
             RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();

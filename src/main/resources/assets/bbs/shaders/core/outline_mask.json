@@ -1,6 +1,6 @@
 {
-    "vertex": "outline_mask",
-    "fragment": "outline_mask",
+    "vertex": "bbs:core/outline_mask",
+    "fragment": "bbs:core/outline_mask",
     "attributes": [
         "Position",
         "Color",

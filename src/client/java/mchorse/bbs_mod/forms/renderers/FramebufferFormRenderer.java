@@ -25,7 +25,8 @@ import mchorse.bbs_mod.utils.interps.Lerps;
 import mchorse.bbs_mod.utils.joml.Vectors;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.gl.ShaderProgramKey;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
@@ -43,8 +44,9 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -55,7 +57,6 @@ import org.lwjgl.system.MemoryStack;
 import java.nio.IntBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
 public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
 {
@@ -99,6 +100,59 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
      */
     private static final ThreadLocal<Camera> PREVIEW_CAMERA = new ThreadLocal<>();
 
+    private static Framebuffer activeFramebuffer;
+    private static final Matrix4f activeProjection = new Matrix4f();
+    private static ProjectionType activeProjectionType;
+    private static boolean activeProjectionValid;
+
+    /**
+     * 1.21.4 Immediate/RenderLayer (and Iris program switches) can steal the main client
+     * framebuffer and overwrite the FBO ortho mid-fill. Re-assert BBS FBO + viewport + the
+     * ortho that was set for this postcard bake — without the projection restore, shaders
+     * leave content drawn with the world perspective into the offscreen target.
+     */
+    public static void rebindActive()
+    {
+        if (activeFramebuffer == null)
+        {
+            return;
+        }
+
+        Texture texture = activeFramebuffer.getMainTexture();
+
+        GlStateManager._viewport(0, 0, texture.width, texture.height);
+        activeFramebuffer.bind();
+
+        if (activeProjectionValid && activeProjectionType != null)
+        {
+            RenderSystem.setProjectionMatrix(activeProjection, activeProjectionType);
+        }
+    }
+
+    public static boolean isFboFillActive()
+    {
+        return activeFramebuffer != null;
+    }
+
+    private static void beginActiveFill(Framebuffer framebuffer, Matrix4f projection, ProjectionType projectionType)
+    {
+        activeFramebuffer = framebuffer;
+        activeProjection.set(projection);
+        activeProjectionType = projectionType;
+        activeProjectionValid = true;
+    }
+
+    private static void endActiveFill(Framebuffer previousFramebuffer)
+    {
+        activeFramebuffer = previousFramebuffer;
+
+        if (previousFramebuffer == null)
+        {
+            activeProjectionValid = false;
+            activeProjectionType = null;
+        }
+    }
+
     public FramebufferFormRenderer(FramebufferForm form)
     {
         super(form);
@@ -131,18 +185,24 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             RenderSystem.depthFunc(GL11.GL_LEQUAL);
             stack.push();
 
-            this.applyTransforms(uiMatrix, context.getTransition());
-            MatrixStackUtils.multiply(stack, uiMatrix);
-            stack.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(180F));
-            stack.peek().getNormalMatrix().getScale(Vectors.EMPTY_3F);
-            stack.peek().getNormalMatrix().scale(1F / Vectors.EMPTY_3F.x, -1F / Vectors.EMPTY_3F.y, 1F / Vectors.EMPTY_3F.z);
+            try
+            {
+                this.applyTransforms(uiMatrix, context.getTransition());
+                MatrixStackUtils.multiply(stack, uiMatrix);
+                stack.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(180F));
+                stack.peek().getNormalMatrix().getScale(Vectors.EMPTY_3F);
+                stack.peek().getNormalMatrix().scale(1F / Vectors.EMPTY_3F.x, -1F / Vectors.EMPTY_3F.y, 1F / Vectors.EMPTY_3F.z);
 
-            this.renderBodyParts(new FormRenderingContext()
-                .set(FormRenderType.ENTITY, this.entity, stack, LightmapTextureManager.pack(15, 15), OverlayTexture.DEFAULT_UV, context.getTransition())
-                .inUI());
-
-            stack.pop();
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+                this.renderBodyParts(new FormRenderingContext()
+                    .set(FormRenderType.ENTITY, this.entity, stack, LightmapTextureManager.pack(15, 15), OverlayTexture.DEFAULT_UV, context.getTransition())
+                    .inUI());
+            }
+            finally
+            {
+                BBSRendering.restoreAfterGuiItemForm();
+                stack.pop();
+                RenderSystem.depthFunc(GL11.GL_ALWAYS);
+            }
         }
     }
 
@@ -227,7 +287,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         Vector3f light0 = RenderSystem.shaderLightDirections[0];
         Vector3f light1 = RenderSystem.shaderLightDirections[1];
         Matrix4f projectionMatrix = new Matrix4f(RenderSystem.getProjectionMatrix());
-        VertexSorter vertexSorter = RenderSystem.getVertexSorting();
+        ProjectionType previousProjectionType = RenderSystem.getProjectionType();
         /* Save both enable + mode — restoring only mode left cull off after the postcard blit
          * and contaminated later StructureForm leaf / VAO draws (esp. NeoForge). */
         boolean savedCullEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
@@ -238,7 +298,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             this.renderFramebufferInner(
                 context, framebuffer, x, y, width, height,
                 prevDraw, prevRead, scissorEnabled, scissorBox, clearColor,
-                light0, light1, projectionMatrix, vertexSorter, cullFace);
+                light0, light1, projectionMatrix, previousProjectionType, cullFace);
         }
         finally
         {
@@ -262,12 +322,11 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         int prevDraw, int prevRead,
         boolean scissorEnabled, int[] scissorBox, float[] clearColor,
         Vector3f light0, Vector3f light1,
-        Matrix4f projectionMatrix, VertexSorter vertexSorter,
+        Matrix4f projectionMatrix, ProjectionType previousProjectionType,
         int cullFace)
     {
         /* FRONT cull only for offscreen content fill (Y-flipped ortho). Restored before blit. */
         GL30.glCullFace(GL30.GL_FRONT);
-
         /* Iris pack: bake flat albedo (Unlit) — pack state can black out limbs if we mix_light
          * inside the FBO; the lit display quad applies world shading once.
          * No pack (root morph / top-level): bake matching world diffuse + caller lightmap into
@@ -298,10 +357,12 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         /* Y is flipped like the legacy [-1, 1] / [1, -1] ortho. Frustum follows
          * view extent even when the FBO is capped — then density drops (pixelates)
          * instead of allocating past {@link #MAX_FRAMEBUFFER_EDGE}. */
-        RenderSystem.setProjectionMatrix(new Matrix4f().setOrtho(-halfX, halfX, halfY, -halfY, -500F, 500F), VertexSorter.BY_Z);
+        Matrix4f orthoProjection = new Matrix4f().setOrtho(-halfX, halfX, halfY, -halfY, -500F, 500F);
+
+        RenderSystem.setProjectionMatrix(orthoProjection, ProjectionType.ORTHOGRAPHIC);
         RenderSystem.getModelViewStack().pushMatrix();
         RenderSystem.getModelViewStack().identity();
-        RenderSystem.applyModelViewMatrix();
+        MatrixStackUtils.applyModelViewMatrix();
 
         framebuffer.apply();
 
@@ -369,8 +430,11 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
 
         fboContext.renderEquipment = context.renderEquipment;
 
+        Framebuffer prevActive = activeFramebuffer;
+
         try
         {
+            beginActiveFill(framebuffer, orthoProjection, ProjectionType.ORTHOGRAPHIC);
             Runnable fillParts = () -> this.renderIsolatedFboBodyParts(fboContext, bakeWorldLighting);
 
             if (bakeWorldLighting)
@@ -384,6 +448,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         }
         finally
         {
+            endActiveFill(prevActive);
             RenderSystem.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
             context.light = savedLight;
             /* ModelForm leaves lightmap off inside offscreen; re-arm before the blit. */
@@ -395,9 +460,9 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
 
         context.stack.pop();
 
-        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDraw);
-        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevRead);
-        GL30.glViewport(x, y, width, height);
+        GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDraw);
+        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevRead);
+        GlStateManager._viewport(x, y, width, height);
 
         if (scissorEnabled)
         {
@@ -410,9 +475,9 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
 
         RenderSystem.setShaderLights(light0, light1);
         RenderSystem.getModelViewStack().popMatrix();
-        RenderSystem.applyModelViewMatrix();
-
-        RenderSystem.setProjectionMatrix(projectionMatrix, vertexSorter);
+        MatrixStackUtils.applyModelViewMatrix();
+        RenderSystem.setProjectionMatrix(projectionMatrix, previousProjectionType);
+        GL11.glCullFace(cullFace);
 
         /* Vanilla root (shaded): content already lit → unlit blit.
          * Iris / body-part (shaded): flat albedo → lit entity_translucent so the postcard
@@ -424,9 +489,9 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         VertexFormat format = shading
             ? VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL
             : VertexFormats.POSITION_TEXTURE_COLOR;
-        Supplier<ShaderProgram> shader = shading
-            ? GameRenderer::getRenderTypeEntityTranslucentProgram
-            : GameRenderer::getPositionTexColorProgram;
+        ShaderProgramKey shader = shading
+            ? ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT
+            : ShaderProgramKeys.POSITION_TEX_COLOR;
 
         this.renderModel(framebuffer.getMainTexture(), format, shader, context.stack, context.overlay, context.light, context.color, context.getTransition(), context);
     }
@@ -450,11 +515,13 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         List<BodyPart> parts = this.getSortedBodyParts(context);
 
         this.prepareFboContentLighting(bakeWorldLighting);
+        rebindActive();
 
         if (ItemBodyPartBatch.renderBodyParts(this, parts, context))
         {
             BBSRendering.restoreWorldRenderState();
             this.prepareFboContentLighting(bakeWorldLighting);
+            rebindActive();
 
             return;
         }
@@ -462,6 +529,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         for (BodyPart part : parts)
         {
             this.prepareFboContentLighting(bakeWorldLighting);
+            rebindActive();
 
             try
             {
@@ -470,10 +538,12 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             finally
             {
                 BBSRendering.restoreWorldRenderState();
+                rebindActive();
             }
         }
 
         this.prepareFboContentLighting(bakeWorldLighting);
+        rebindActive();
     }
 
     /**
@@ -494,7 +564,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         }
     }
 
-    private void renderModel(Texture texture, VertexFormat format, Supplier<ShaderProgram> shader, MatrixStack matrices, int overlay, int light, int overlayColor, float transition, FormRenderingContext context)
+    private void renderModel(Texture texture, VertexFormat format, ShaderProgramKey shader, MatrixStack matrices, int overlay, int light, int overlayColor, float transition, FormRenderingContext context)
     {
         float w = texture.width;
         float h = texture.height;
@@ -535,7 +605,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         this.renderQuad(format, texture, shader, matrices, overlay, light, overlayColor, transition, context);
     }
 
-    private void renderQuad(VertexFormat format, Texture texture, Supplier<ShaderProgram> shader, MatrixStack matrices, int overlay, int light, int overlayColor, float transition, FormRenderingContext context)
+    private void renderQuad(VertexFormat format, Texture texture, ShaderProgramKey shader, MatrixStack matrices, int overlay, int light, int overlayColor, float transition, FormRenderingContext context)
     {
         this.hasBillboardCapture = false;
 

@@ -1,6 +1,6 @@
 {
-    "vertex": "outline_composite",
-    "fragment": "outline_dilate_h",
+    "vertex": "bbs:core/outline_composite",
+    "fragment": "bbs:core/outline_dilate_h",
     "attributes": [
         "Position",
         "UV0"

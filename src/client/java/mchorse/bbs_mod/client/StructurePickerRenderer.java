@@ -10,9 +10,9 @@ import mchorse.bbs_mod.ui.items.UIStructurePickerPanel;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
@@ -74,7 +74,7 @@ public class StructurePickerRenderer
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         MatrixStack stack = context.matrixStack();
 
@@ -122,7 +122,7 @@ public class StructurePickerRenderer
         /* Corner handles + scale axes always on top so they stay readable. */
         RenderSystem.disableDepthTest();
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         StructurePickerRenderer.renderCornerGizmos(stack, camera);
 
         if (StructurePickerScaleGizmo.isActive())

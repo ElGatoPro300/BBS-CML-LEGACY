@@ -11,7 +11,7 @@ import mchorse.bbs_mod.utils.colors.Color;
 
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.RotationAxis;
 
@@ -19,8 +19,8 @@ import org.joml.Matrix4f;
 import org.joml.Vector4f;
 
 import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
 
 import org.lwjgl.opengl.GL11;
 
@@ -47,12 +47,13 @@ public class UIImageRenderer
         int width = frameW / 2;
         int height = frameH / 2;
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
+        ProjectionType savedProjType = RenderSystem.getProjectionType();
         /* X/Y rotations move quad corners into Z. The old ±100 near/far clipped
          * those sides as angle increased; size the depth range for screen-scale quads. */
         float zExtent = Math.max(1000F, Math.max(width, height) * 8F);
         Matrix4f ortho = new Matrix4f().ortho(0, width, height, 0, -zExtent, zExtent);
 
-        RenderSystem.setProjectionMatrix(ortho, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
         RenderSystem.disableCull();
         RenderSystem.enableBlend();
@@ -132,7 +133,12 @@ public class UIImageRenderer
                     }
                 }
 
-                Supplier<ShaderProgram> supplier = program != null ? () -> program : GameRenderer::getPositionTexColorProgram;
+                Supplier<ShaderProgram> supplier = program != null ? () -> program : () ->
+                {
+                    RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX_COLOR);
+
+                    return RenderSystem.getShader();
+                };
 
                 if (overlay.blendMode != 0)
                 {
@@ -165,7 +171,7 @@ public class UIImageRenderer
                             break;
                     }
                 }
-                batcher.texturedBox(supplier, texture.id, color, drawX, drawY, fw, fh, uv[0], uv[1], uv[2], uv[3], texture.width, texture.height);
+                batcher.texturedBox(program, texture.id, color, drawX, drawY, fw, fh, uv[0], uv[1], uv[2], uv[3], texture.width, texture.height);
                 if (overlay.blendMode != 0)
                 {
                     batcher.flushDraw();
@@ -177,7 +183,7 @@ public class UIImageRenderer
             });
         }
 
-        RenderSystem.setProjectionMatrix(cache, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(cache, savedProjType);
         RenderSystem.enableCull();
     }
 

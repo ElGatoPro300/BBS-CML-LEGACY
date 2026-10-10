@@ -4,8 +4,8 @@
         "srcrgb": "srcalpha",
         "dstrgb": "1-srcalpha"
     },
-    "vertex": "outline_composite",
-    "fragment": "outline_composite",
+    "vertex": "bbs:core/outline_composite",
+    "fragment": "bbs:core/outline_composite",
     "attributes": [
         "Position",
         "UV0"
