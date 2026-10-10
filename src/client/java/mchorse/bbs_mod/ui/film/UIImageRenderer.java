@@ -86,7 +86,7 @@ public class UIImageRenderer
 
     public static void renderImages(Batcher2D batcher, List<ImageOverlay> images, int width, int height)
     {
-        if (images == null || images.isEmpty())
+        if (images == null || images.isEmpty() || width <= 0 || height <= 0)
         {
             return;
         }
@@ -196,6 +196,16 @@ public class UIImageRenderer
         }
 
         renderImages(batcher, Collections.singletonList(overlay), width, height);
+    }
+
+    public static void renderImage(PoseStack stack, Batcher2D batcher, ImageOverlay overlay, int frameW, int frameH)
+    {
+        renderImage(batcher, overlay, frameW, frameH);
+    }
+
+    public static void renderImages(PoseStack stack, Batcher2D batcher, List<ImageOverlay> images, int frameW, int frameH)
+    {
+        renderImages(batcher, images, frameW, frameH);
     }
 
     public static void renderImages(PoseStack stack, Batcher2D batcher, List<ImageOverlay> images)

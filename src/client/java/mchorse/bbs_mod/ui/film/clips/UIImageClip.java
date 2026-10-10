@@ -448,6 +448,7 @@ public class UIImageClip extends UIClip<ImageClip>
             return widthPercent;
         }
 
+        /* Match UIImageRenderer: W%/H% are of the current film frame. */
         return widthPercent * screenW * dimensions[1] / ((double) dimensions[0] * screenH);
     }
 

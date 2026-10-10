@@ -34,24 +34,22 @@ public class UIWelcomeLayoutSlide extends UIElement
 {
     public enum LayoutPreset
     {
-        PREMIERE(UIKeys.WELCOME_LAYOUT_PREMIERE_NAME, UIKeys.WELCOME_LAYOUT_PREMIERE_DESC, "premiere_style", "1920x1080 • 16:9", "Estilo Premiere"),
-        HORIZONTAL(UIKeys.WELCOME_LAYOUT_HORIZONTAL_NAME, UIKeys.WELCOME_LAYOUT_HORIZONTAL_DESC, "horizontal_simplified", "1920x1080 • 16:9", "Horizontal"),
-        VERTICAL(UIKeys.WELCOME_LAYOUT_VERTICAL_NAME, UIKeys.WELCOME_LAYOUT_VERTICAL_DESC, "vertical_simplified", "1080x1920 • 9:16", "Vertical (9:16)"),
-        CUSTOM(UIKeys.WELCOME_LAYOUT_CUSTOM_NAME, UIKeys.WELCOME_LAYOUT_CUSTOM_DESC, null, "1920x1080 • 16:9", "Personalizado");
+        PREMIERE(UIKeys.WELCOME_LAYOUT_PREMIERE_NAME, UIKeys.WELCOME_LAYOUT_PREMIERE_DESC, "premiere_style", "1920x1080 • 16:9"),
+        HORIZONTAL(UIKeys.WELCOME_LAYOUT_HORIZONTAL_NAME, UIKeys.WELCOME_LAYOUT_HORIZONTAL_DESC, "horizontal_simplified", "1920x1080 • 16:9"),
+        VERTICAL(UIKeys.WELCOME_LAYOUT_VERTICAL_NAME, UIKeys.WELCOME_LAYOUT_VERTICAL_DESC, "vertical_simplified", "1080x1920 • 9:16"),
+        CUSTOM(UIKeys.WELCOME_LAYOUT_CUSTOM_NAME, UIKeys.WELCOME_LAYOUT_CUSTOM_DESC, null, "1920x1080 • 16:9");
 
         public final IKey title;
         public final IKey description;
         public final String resource;
         public final String badge;
-        public final String shortLabel;
 
-        private LayoutPreset(IKey title, IKey description, String resource, String badge, String shortLabel)
+        private LayoutPreset(IKey title, IKey description, String resource, String badge)
         {
             this.title = title;
             this.description = description;
             this.resource = resource;
             this.badge = badge;
-            this.shortLabel = shortLabel;
         }
     }
 
@@ -204,14 +202,14 @@ public class UIWelcomeLayoutSlide extends UIElement
             float topH = h * 0.58F;
             float botH = h - topH;
 
-            this.drawReplayMultiTrackTimeline(batcher, x, y, leftW, topH, "Línea de tiempo de replay");
-            this.drawPropertiesGeneralPanel(batcher, x, y + topH, leftW, botH, "Propiedades generales");
+            this.drawReplayMultiTrackTimeline(batcher, x, y, leftW, topH, UIKeys.WELCOME_PANEL_REPLAY_TIMELINE.get());
+            this.drawPropertiesGeneralPanel(batcher, x, y + topH, leftW, botH, UIKeys.WELCOME_PANEL_GENERAL_PROPERTIES.get());
 
-            this.drawViewportPanel(batcher, x + leftW, y, midW, topH, "Visor", false);
-            this.drawCameraClipTimeline(batcher, x + leftW, y + topH, midW, botH, "Línea de tiempo de cámara");
+            this.drawViewportPanel(batcher, x + leftW, y, midW, topH, UIKeys.WELCOME_PANEL_VISOR.get(), false);
+            this.drawCameraClipTimeline(batcher, x + leftW, y + topH, midW, botH, UIKeys.WELCOME_PANEL_CAMERA_TIMELINE.get());
 
-            this.drawReplaysActorListPanel(batcher, x + leftW + midW, y, rightW, h * 0.55F, "Reproducciones");
-            this.drawGeneralInspectorPanel(batcher, x + leftW + midW, y + h * 0.55F, rightW, h * 0.45F, "General");
+            this.drawReplaysActorListPanel(batcher, x + leftW + midW, y, rightW, h * 0.55F, UIKeys.WELCOME_PANEL_REPLAYS.get());
+            this.drawGeneralInspectorPanel(batcher, x + leftW + midW, y + h * 0.55F, rightW, h * 0.45F, UIKeys.WELCOME_PANEL_GENERAL.get());
         }
         else if (preset == LayoutPreset.HORIZONTAL)
         {
@@ -223,12 +221,12 @@ public class UIWelcomeLayoutSlide extends UIElement
             float leftW = w * 0.66F;
             float rightW = w - leftW;
 
-            this.drawViewportPanel(batcher, x, y, leftW, topH, "Visor Panorámico", false);
-            this.drawPropertiesGeneralPanel(batcher, x + leftW, y, rightW, topH, "Propiedades generales");
+            this.drawViewportPanel(batcher, x, y, leftW, topH, UIKeys.WELCOME_PANEL_VISOR_PANORAMIC.get(), false);
+            this.drawPropertiesGeneralPanel(batcher, x + leftW, y, rightW, topH, UIKeys.WELCOME_PANEL_GENERAL_PROPERTIES.get());
 
-            this.drawTabbedUnifiedTimeline(batcher, x, y + topH, leftW, botH, "Línea de tiempo de cámara");
-            this.drawReplaysActorListPanel(batcher, x + leftW, y + topH, rightW, botH * 0.55F, "Reproducciones");
-            this.drawGeneralInspectorPanel(batcher, x + leftW, y + topH + botH * 0.55F, rightW, botH * 0.45F, "General");
+            this.drawTabbedUnifiedTimeline(batcher, x, y + topH, leftW, botH, UIKeys.WELCOME_PANEL_CAMERA_TIMELINE.get());
+            this.drawReplaysActorListPanel(batcher, x + leftW, y + topH, rightW, botH * 0.55F, UIKeys.WELCOME_PANEL_REPLAYS.get());
+            this.drawGeneralInspectorPanel(batcher, x + leftW, y + topH + botH * 0.55F, rightW, botH * 0.45F, UIKeys.WELCOME_PANEL_GENERAL.get());
         }
         else if (preset == LayoutPreset.VERTICAL)
         {
@@ -240,12 +238,12 @@ public class UIWelcomeLayoutSlide extends UIElement
             float rightW = w * 0.36F;
             float midW = w - leftW - rightW;
 
-            this.drawPropertiesGeneralPanel(batcher, x, y, leftW, h * 0.35F, "Propiedades generales");
-            this.drawReplaysActorListPanel(batcher, x, y + h * 0.35F, leftW, h * 0.35F, "Reproducciones");
-            this.drawGeneralInspectorPanel(batcher, x, y + h * 0.70F, leftW, h * 0.30F, "General");
+            this.drawPropertiesGeneralPanel(batcher, x, y, leftW, h * 0.35F, UIKeys.WELCOME_PANEL_GENERAL_PROPERTIES.get());
+            this.drawReplaysActorListPanel(batcher, x, y + h * 0.35F, leftW, h * 0.35F, UIKeys.WELCOME_PANEL_REPLAYS.get());
+            this.drawGeneralInspectorPanel(batcher, x, y + h * 0.70F, leftW, h * 0.30F, UIKeys.WELCOME_PANEL_GENERAL.get());
 
-            this.drawVerticalTallTimeline(batcher, x + leftW, y, midW, h, "Línea de tiempo de cámara");
-            this.drawViewportPanel(batcher, x + leftW + midW, y, rightW, h, "Visor (9:16)", true);
+            this.drawVerticalTallTimeline(batcher, x + leftW, y, midW, h, UIKeys.WELCOME_PANEL_CAMERA_TIMELINE.get());
+            this.drawViewportPanel(batcher, x + leftW + midW, y, rightW, h, UIKeys.WELCOME_PANEL_VISOR_VERTICAL.get(), true);
         }
         else
         {
@@ -255,11 +253,11 @@ public class UIWelcomeLayoutSlide extends UIElement
             float topH = h * 0.58F;
             float botH = h - topH;
 
-            this.drawViewportPanel(batcher, x, y, leftW, topH, "Visor 3D", false);
-            this.drawReplaysActorListPanel(batcher, x + leftW, y, rightW, topH * 0.55F, "Reproducciones");
-            this.drawGeneralInspectorPanel(batcher, x + leftW, y + topH * 0.55F, rightW, topH * 0.45F, "General");
-            this.drawCameraClipTimeline(batcher, x, y + topH, leftW, botH, "Línea de tiempo de cámara");
-            this.drawPropertiesGeneralPanel(batcher, x + leftW, y + topH, rightW, botH, "Propiedades generales");
+            this.drawViewportPanel(batcher, x, y, leftW, topH, UIKeys.WELCOME_PANEL_VISOR_3D.get(), false);
+            this.drawReplaysActorListPanel(batcher, x + leftW, y, rightW, topH * 0.55F, UIKeys.WELCOME_PANEL_REPLAYS.get());
+            this.drawGeneralInspectorPanel(batcher, x + leftW, y + topH * 0.55F, rightW, topH * 0.45F, UIKeys.WELCOME_PANEL_GENERAL.get());
+            this.drawCameraClipTimeline(batcher, x, y + topH, leftW, botH, UIKeys.WELCOME_PANEL_CAMERA_TIMELINE.get());
+            this.drawPropertiesGeneralPanel(batcher, x + leftW, y + topH, rightW, botH, UIKeys.WELCOME_PANEL_GENERAL_PROPERTIES.get());
         }
     }
 
@@ -415,7 +413,7 @@ public class UIWelcomeLayoutSlide extends UIElement
             batcher.box(rx, bodyY + 1, rx + 0.8F, bodyY + rulerH - 1, 0x55ffffff);
         }
 
-        /* Green clip bar "Estacionario" */
+        /* Green idle clip bar */
         float clipY = bodyY + rulerH + 4;
         float clipH = Math.min(bodyH - rulerH - 8, 8F);
         float clipW = w * 0.78F;
@@ -432,7 +430,7 @@ public class UIWelcomeLayoutSlide extends UIElement
                 Matrix3x2fStack matrices = batcher.getContext().pose();
                 matrices.pushMatrix();
                 matrices.scale(scale, scale);
-                batcher.text("Estacionario", (x + 6) / scale, (clipY + 1.5F) / scale, 0xff042f1f, false);
+                batcher.text(UIKeys.WELCOME_PANEL_IDLE_CLIP.get(), (x + 6) / scale, (clipY + 1.5F) / scale, 0xff042f1f, false);
                 matrices.popMatrix();
             }
         }
@@ -594,7 +592,7 @@ public class UIWelcomeLayoutSlide extends UIElement
 
         batcher.box(x, bodyY, x + w, bodyY + bodyH, 0xff0e0c12);
 
-        /* Action buttons mockup ("Elegir", "Editar") */
+        /* Action buttons mockup */
         float btnY = bodyY + 3;
         float btnH = Math.min(bodyH - 6, 6.5F);
         float btnW = (w - 10) * 0.5F;
@@ -660,7 +658,7 @@ public class UIWelcomeLayoutSlide extends UIElement
             context.batcher.outline(this.area.x, this.area.y, this.area.ex(), this.area.ey(), outlineColor);
 
             FontRenderer font = context.batcher.getFont();
-            String title = this.preset.shortLabel;
+            String title = this.preset.title.get();
             int tx = this.area.mx(font.getWidth(title));
             int ty = this.area.my(font.getHeight());
 
