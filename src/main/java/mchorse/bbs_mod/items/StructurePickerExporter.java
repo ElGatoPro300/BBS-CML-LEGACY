@@ -53,7 +53,7 @@ public class StructurePickerExporter
         Vec3i size = max.subtract(min).add(1, 1, 1);
         StructureTemplate template = new StructureTemplate();
 
-        template.saveFromWorld(world, min, size, true, Blocks.STRUCTURE_VOID);
+        template.saveFromWorld(world, min, size, true, List.of(Blocks.STRUCTURE_VOID));
         filterTemplate(template, min, new HashSet<>(blocks));
 
         File generatedFolder = world.getServer().getSavePath(WorldSavePath.GENERATED).toFile();
@@ -180,7 +180,7 @@ public class StructurePickerExporter
         BlockPos immutable = pos.toImmutable();
         BlockState state = world.getBlockState(immutable);
         BlockEntity entity = world.getBlockEntity(immutable);
-        NbtCompound nbt = entity == null ? null : entity.createNbtWithId(world.getRegistryManager());
+        NbtCompound nbt = entity == null ? null : entity.createNbtWithIdentifyingData(world.getRegistryManager());
 
         return new BlockSnapshot(immutable, state, nbt);
     }

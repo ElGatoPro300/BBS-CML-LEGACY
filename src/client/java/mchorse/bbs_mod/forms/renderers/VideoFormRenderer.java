@@ -4,6 +4,8 @@ import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.camera.Camera;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
+import mchorse.bbs_mod.client.BBSUniform;
+import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.client.video.VideoFormEngine;
 import mchorse.bbs_mod.client.video.VideoFormPlayback;
 import mchorse.bbs_mod.client.video.VideoRenderer;
@@ -12,7 +14,9 @@ import mchorse.bbs_mod.film.replays.Replay;
 import mchorse.bbs_mod.forms.ITickable;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.forms.VideoForm;
+import mchorse.bbs_mod.forms.renderers.utils.BillboardRenderLayers;
 import mchorse.bbs_mod.forms.renderers.utils.SoftFlatFaceSort;
+import mchorse.bbs_mod.graphics.texture.AdoptedTexture;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.ui.dashboard.UIDashboard;
@@ -29,24 +33,20 @@ import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.Identifier;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
 
@@ -90,7 +90,9 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
     @Override
     public void renderInUI(UIContext context, int x1, int y1, int x2, int y2)
     {
-        MatrixStack stack = context.batcher.getContext().getMatrices();
+        context.batcher.flush();
+
+        MatrixStack stack = new MatrixStack();
 
         stack.push();
 
@@ -113,9 +115,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             stack.scale(1.5F, 1.5F, 1.5F);
             stack.scale(this.form.uiScale.get(), this.form.uiScale.get(), this.form.uiScale.get());
 
-            Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
-            Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
-            RenderSystem.setupLevelDiffuseLighting(light0, light1);
+            BBSRendering.setupEntityInUiLighting();
 
             this.renderModel(stack, Colors.WHITE, context.getTransition(), null, true, true, null);
         }
@@ -641,10 +641,10 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         int textureIdSnapshot = textureId;
         boolean linear = this.form.linear.get();
         boolean picking = deferContext != null && deferContext.isPicking();
+        ShaderProgram pickShader = null;
         int lightSnapshot = deferContext != null ? deferContext.light : LightmapTextureManager.MAX_LIGHT_COORDINATE;
         int overlaySnapshot = deferContext != null ? deferContext.overlay : OverlayTexture.DEFAULT_UV;
         boolean guiPass = isGuiVideoPass(deferContext);
-        ShaderProgram pickShader = null;
 
         if (picking)
         {
@@ -758,18 +758,10 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
      */
     private void restoreGuiVideoPassState()
     {
-        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-        RenderSystem.defaultBlendFunc();
+        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+        BBSRendering.defaultBlendFunc();
         BBSRendering.resetPixelUnpackState();
         BBSRendering.clearTextureUnit0();
-
-        MinecraftClient client = MinecraftClient.getInstance();
-
-        if (client != null && client.gameRenderer != null)
-        {
-            client.gameRenderer.getLightmapTextureManager().disable();
-            client.gameRenderer.getOverlayTexture().teardownOverlayColor();
-        }
     }
 
     private float getDistanceSqToCamera(FormRenderingContext context)
@@ -902,9 +894,9 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         }
         finally
         {
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.enableCull();
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.enableCull();
+            BBSRendering.defaultBlendFunc();
 
             if (guiPass)
             {
@@ -915,11 +907,11 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
                 BBSRendering.restoreWorldRenderState();
             }
 
-            RenderSystem.depthMask(previousDepthMask);
+            BBSRendering.depthMask(previousDepthMask);
 
             if (!previousCull)
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
         }
     }
@@ -931,19 +923,19 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
     private void drawVideoFrontIris(Matrix4f matrix, Color tint, Quad quad, int textureId, boolean depthWrite,
         int light, int overlay)
     {
-        GameRenderer gameRenderer = MinecraftClient.getInstance().gameRenderer;
+        boolean softForm = !depthWrite || tint.a < ShaderOpacityPatch.LIVE_DEPTH_WRITE_ALPHA;
+        ShaderProgram shader = softForm
+            ? BBSRendering.getEntityTranslucentProgram()
+            : BBSRendering.getEntityCutoutProgram();
 
-        gameRenderer.getLightmapTextureManager().enable();
-        gameRenderer.getOverlayTexture().setupOverlayColor();
-
-        RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
-        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-        RenderSystem.setShaderTexture(0, textureId);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(depthWrite);
+        BBSRendering.bindProgram(shader);
+        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+        BBSRendering.setShaderTexture(0, textureId);
+        BBSRendering.enableBlend();
+        BBSRendering.defaultBlendFunc();
+        BBSRendering.disableCull();
+        BBSRendering.enableDepthTest();
+        BBSRendering.depthMask(depthWrite);
 
         MatrixStack stack = new MatrixStack();
 
@@ -962,75 +954,95 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         this.irisVert(buffer, entry, quad.p2.x, quad.p2.y, FACE_Z_BIAS, 1F, 0F, tint, overlay, light);
         this.irisVert(buffer, entry, quad.p1.x, quad.p1.y, FACE_Z_BIAS, 0F, 0F, tint, overlay, light);
 
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
+        Identifier adoptedId = AdoptedTexture.identifier(textureId, (int) Math.max(1, this.lastFrameW), (int) Math.max(1, this.lastFrameH), this.form.linear.get());
+        BillboardRenderLayers.draw(buffer.end(), adoptedId, this.form.linear.get(), false, depthWrite, false);
     }
 
-    /** No-shader path: bbs:video (tex discard a &lt; 0.1 + optional FormColorGrade). */
+    /** No-shader path: bbs:video (tex discard a < 0.1 + optional FormColorGrade). */
     private void drawVideoFrontBbs(Matrix4f matrix, Color tint, Quad quad, int textureId, boolean depthWrite)
     {
         ShaderProgram videoProgram = BBSShaders.getVideoProgram();
+        ShaderProgram shader = videoProgram != null
+            ? videoProgram
+            : BBSRendering.getPositionTexProgram();
+
+        BBSRendering.bindProgram(shader);
+        BBSRendering.setShaderColor(tint.r, tint.g, tint.b, tint.a);
+        BBSRendering.setShaderTexture(0, textureId);
 
         if (videoProgram != null)
         {
-            RenderSystem.setShader(videoProgram);
-        }
-        else
-        {
-            RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
-        }
-        RenderSystem.setShaderColor(tint.r, tint.g, tint.b, tint.a);
-        RenderSystem.setShaderTexture(0, textureId);
+            Color formColor = this.form.color.get();
 
-        if (videoProgram != null)
-        {
-            GlUniform gradeUniform = videoProgram.getUniform("FormColorGrade");
-
-            if (gradeUniform != null)
+            if (formColor != null && formColor.hasColorAdjustments())
             {
-                Color formColor = this.form.color.get();
-
-                if (formColor != null && formColor.hasColorAdjustments())
-                {
-                    gradeUniform.set(formColor.brightness, formColor.contrast, formColor.hue, formColor.saturation);
-                }
-                else
-                {
-                    gradeUniform.set(0F, 0F, 0F, 0F);
-                }
+                BBSUniform.set(videoProgram, "FormColorGrade", formColor.brightness, formColor.contrast, formColor.hue, formColor.saturation);
+            }
+            else
+            {
+                BBSUniform.set(videoProgram, "FormColorGrade", 0F, 0F, 0F, 0F);
             }
         }
 
         try
         {
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableCull();
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(depthWrite);
+            BBSRendering.enableBlend();
+            BBSRendering.defaultBlendFunc();
+            BBSRendering.disableCull();
+            BBSRendering.enableDepthTest();
+            BBSRendering.depthMask(depthWrite);
 
-            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
+            MatrixStack stack = new MatrixStack();
+            stack.peek().getPositionMatrix().set(matrix);
+            stack.peek().getNormalMatrix().identity();
+            MatrixStack.Entry entry = stack.peek();
 
-            this.tex(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F);
-            this.tex(buffer, matrix, quad.p4.x, quad.p4.y, FACE_Z_BIAS, 1F, 1F);
-            this.tex(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, 1F, 0F);
+            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
 
-            this.tex(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F);
-            this.tex(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, 1F, 0F);
-            this.tex(buffer, matrix, quad.p1.x, quad.p1.y, FACE_Z_BIAS, 0F, 0F);
+            int light = LightmapTextureManager.MAX_LIGHT_COORDINATE;
+            int overlay = OverlayTexture.DEFAULT_UV;
 
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
+            this.irisVert(buffer, entry, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, tint, overlay, light);
+            this.irisVert(buffer, entry, quad.p4.x, quad.p4.y, FACE_Z_BIAS, 1F, 1F, tint, overlay, light);
+            this.irisVert(buffer, entry, quad.p2.x, quad.p2.y, FACE_Z_BIAS, 1F, 0F, tint, overlay, light);
+
+            this.irisVert(buffer, entry, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, tint, overlay, light);
+            this.irisVert(buffer, entry, quad.p2.x, quad.p2.y, FACE_Z_BIAS, 1F, 0F, tint, overlay, light);
+            this.irisVert(buffer, entry, quad.p1.x, quad.p1.y, FACE_Z_BIAS, 0F, 0F, tint, overlay, light);
+
+            Identifier adoptedId = AdoptedTexture.identifier(textureId, (int) Math.max(1, this.lastFrameW), (int) Math.max(1, this.lastFrameH), this.form.linear.get());
+            BillboardRenderLayers.draw(buffer.end(), adoptedId, this.form.linear.get(), false, depthWrite, false);
         }
         finally
         {
             if (videoProgram != null)
             {
-                GlUniform gradeUniform = videoProgram.getUniform("FormColorGrade");
-
-                if (gradeUniform != null)
-                {
-                    gradeUniform.set(0F, 0F, 0F, 0F);
-                }
+                BBSUniform.set(videoProgram, "FormColorGrade", 0F, 0F, 0F, 0F);
             }
+        }
+    }
+
+    private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, ShaderProgram shader)
+    {
+        BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+
+        this.col(buffer, matrix, quad.p1.x, quad.p1.y, FACE_Z_BIAS, color);
+        this.col(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, color);
+        this.col(buffer, matrix, quad.p4.x, quad.p4.y, FACE_Z_BIAS, color);
+
+        this.col(buffer, matrix, quad.p1.x, quad.p1.y, FACE_Z_BIAS, color);
+        this.col(buffer, matrix, quad.p4.x, quad.p4.y, FACE_Z_BIAS, color);
+        this.col(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, color);
+
+        if (shader != null)
+        {
+            BBSRendering.bindProgram(shader);
+            BufferRenderer.drawWithGlobalProgram(buffer.end());
+        }
+        else
+        {
+            BBSRendering.bindProgram(BBSRendering.getPositionColorProgram());
+            BufferRenderer.drawWithGlobalProgram(buffer.end());
         }
     }
 
@@ -1068,14 +1080,14 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
         try
         {
-            RenderSystem.setShader(shader);
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.setShaderTexture(0, textureId);
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableCull();
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(true);
+            BBSRendering.bindProgram(shader);
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.setShaderTexture(0, textureId);
+            BBSRendering.enableBlend();
+            BBSRendering.defaultBlendFunc();
+            BBSRendering.disableCull();
+            BBSRendering.enableDepthTest();
+            BBSRendering.depthMask(true);
 
             BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_LIGHT_COLOR);
 
@@ -1092,15 +1104,15 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         }
         finally
         {
-            RenderSystem.depthMask(previousDepthMask);
+            BBSRendering.depthMask(previousDepthMask);
 
             if (previousCull)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
         }
     }
@@ -1108,56 +1120,6 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
     private void pickVert(BufferBuilder buffer, Matrix4f matrix, float x, float y, float z, float u, float v, int light, Color color)
     {
         buffer.vertex(matrix, x, y, z).texture(u, v).light(light).color(color.r, color.g, color.b, color.a);
-    }
-
-    private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, ShaderProgram shader)
-    {
-        boolean previousCull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
-        boolean previousDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-
-        try
-        {
-            if (shader != null)
-            {
-                RenderSystem.setShader(shader);
-            }
-            else
-            {
-                RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-            }
-
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableCull();
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(true);
-
-            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
-
-            this.col(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, color);
-            this.col(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, color);
-            this.col(buffer, matrix, quad.p1.x, quad.p1.y, FACE_Z_BIAS, color);
-
-            this.col(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, color);
-            this.col(buffer, matrix, quad.p4.x, quad.p4.y, FACE_Z_BIAS, color);
-            this.col(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, color);
-
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
-        }
-        finally
-        {
-            RenderSystem.depthMask(previousDepthMask);
-
-            if (previousCull)
-            {
-                RenderSystem.enableCull();
-            }
-            else
-            {
-                RenderSystem.disableCull();
-            }
-        }
     }
 
     private void tex(BufferBuilder buffer, Matrix4f matrix, float x, float y, float z, float u, float v)

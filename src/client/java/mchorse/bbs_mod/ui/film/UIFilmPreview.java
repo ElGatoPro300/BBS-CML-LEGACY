@@ -65,8 +65,10 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -914,13 +916,11 @@ public class UIFilmPreview extends UIElement
 
         stack.pushMatrix();
 
-        stack.mul(context.batcher.getContext().getMatrices().peek().getPositionMatrix());
         stack.translate(area.x + 16, area.ey() - 12, 0F);
         stack.rotate(RotationAxis.NEGATIVE_X.rotationDegrees(mcCamera.getPitch()));
         stack.rotate(RotationAxis.POSITIVE_Y.rotationDegrees(mcCamera.getYaw()));
         stack.scale(-1F, -1F, -1F);
         MatrixStackUtils.applyModelViewMatrix();
-        RenderSystem.renderCrosshair(10);
 
         stack.popMatrix();
         MatrixStackUtils.applyModelViewMatrix();
@@ -956,55 +956,96 @@ public class UIFilmPreview extends UIElement
 
         if (viewportTexture != null && viewportTexture.isValid() && viewportTexture.width > 0 && viewportTexture.height > 0)
         {
+            int prevPbo = GL11.glGetInteger(GL30.GL_PIXEL_PACK_BUFFER_BINDING);
+            int prevPackRowLength = GL11.glGetInteger(GL11.GL_PACK_ROW_LENGTH);
+            int prevPackSkipPixels = GL11.glGetInteger(GL11.GL_PACK_SKIP_PIXELS);
+            int prevPackSkipRows = GL11.glGetInteger(GL11.GL_PACK_SKIP_ROWS);
+            int prevPackAlignment = GL11.glGetInteger(GL11.GL_PACK_ALIGNMENT);
+
             try
             {
-                int width = viewportTexture.width;
-                int height = viewportTexture.height;
-                FloatBuffer pixelData = BufferUtils.createFloatBuffer(width * height * 4);
-
                 viewportTexture.bind();
-                GL11.glGetTexImage(viewportTexture.target, 0, GL11.GL_RGBA, GL11.GL_FLOAT, pixelData);
-                viewportTexture.unbind();
-                pixelData.rewind();
 
-                int[] pixels = new int[width * height];
+                /* Prefer actual GL size — metadata can lag behind video-resolution resizes and
+                 * undersized buffers crash natively in glGetTexImage. */
+                int glWidth = GL11.glGetTexLevelParameteri(viewportTexture.target, 0, GL11.GL_TEXTURE_WIDTH);
+                int glHeight = GL11.glGetTexLevelParameteri(viewportTexture.target, 0, GL11.GL_TEXTURE_HEIGHT);
 
-                for (int y = 0; y < height; ++y)
+                if (glWidth > 0 && glHeight > 0)
                 {
-                    for (int x = 0; x < width; ++x)
-                    {
-                        float r = pixelData.get() * 255F;
-                        float g = pixelData.get() * 255F;
-                        float b = pixelData.get() * 255F;
-                        float a = pixelData.get() * 255F;
-                        int i = ((height - 1) - y) * width + x;
+                    final int width = glWidth;
+                    final int height = glHeight;
+                    long samples = (long) width * (long) height * 4L;
 
-                        pixels[i] = ((int) a << 24) + ((int) r << 16) + ((int) g << 8) + (int) b;
-                    }
-                }
-
-                if (!this.isThumbnailPixelDataValid(pixels))
-                {
-                    if (onComplete != null)
+                    if (samples <= 0L || samples > Integer.MAX_VALUE)
                     {
-                        onComplete.run();
+                        viewportTexture.unbind();
+
+                        if (onComplete != null)
+                        {
+                            onComplete.run();
+                        }
+
+                        return;
                     }
+
+                    GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, 0);
+                    GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, 0);
+                    GL11.glPixelStorei(GL11.GL_PACK_SKIP_PIXELS, 0);
+                    GL11.glPixelStorei(GL11.GL_PACK_SKIP_ROWS, 0);
+                    GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 4);
+
+                    ByteBuffer pixelData = BufferUtils.createByteBuffer((int) samples);
+
+                    GL11.glGetTexImage(viewportTexture.target, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelData);
+                    viewportTexture.unbind();
+                    pixelData.rewind();
+
+                    int[] pixels = new int[width * height];
+
+                    for (int y = 0; y < height; ++y)
+                    {
+                        for (int x = 0; x < width; ++x)
+                        {
+                            int r = pixelData.get() & 0xFF;
+                            int g = pixelData.get() & 0xFF;
+                            int b = pixelData.get() & 0xFF;
+                            int a = pixelData.get() & 0xFF;
+                            int i = ((height - 1) - y) * width + x;
+
+                            pixels[i] = (a << 24) + (r << 16) + (g << 8) + b;
+                        }
+                    }
+
+                    if (!this.isThumbnailPixelDataValid(pixels))
+                    {
+                        if (onComplete != null)
+                        {
+                            onComplete.run();
+                        }
+
+                        return;
+                    }
+
+                    new Thread(() ->
+                    {
+                        ScreenshotRecorder.ScreenshotRunner runner = new ScreenshotRecorder.ScreenshotRunner(width, height, pixels, output);
+
+                        runner.playSound = false;
+                        runner.run();
+
+                        if (onComplete != null)
+                        {
+                            MinecraftClient.getInstance().execute(onComplete);
+                        }
+                    }).start();
 
                     return;
                 }
-
-                new Thread(() ->
+                else
                 {
-                    ScreenshotRecorder.ScreenshotRunner runner = new ScreenshotRecorder.ScreenshotRunner(width, height, pixels, output);
-
-                    runner.playSound = false;
-                    runner.run();
-
-                    if (onComplete != null)
-                    {
-                        MinecraftClient.getInstance().execute(onComplete);
-                    }
-                }).start();
+                    viewportTexture.unbind();
+                }
             }
             catch (Exception e)
             {
@@ -1014,9 +1055,17 @@ public class UIFilmPreview extends UIElement
                 {
                     onComplete.run();
                 }
-            }
 
-            return;
+                return;
+            }
+            finally
+            {
+                GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, prevPbo);
+                GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, prevPackRowLength);
+                GL11.glPixelStorei(GL11.GL_PACK_SKIP_PIXELS, prevPackSkipPixels);
+                GL11.glPixelStorei(GL11.GL_PACK_SKIP_ROWS, prevPackSkipRows);
+                GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, prevPackAlignment);
+            }
         }
 
         Area area = this.getViewport();
@@ -1049,46 +1098,78 @@ public class UIFilmPreview extends UIElement
             return;
         }
 
-        FloatBuffer pixelData = BufferUtils.createFloatBuffer(width * height * 4);
+        int prevPbo = GL11.glGetInteger(GL30.GL_PIXEL_PACK_BUFFER_BINDING);
+        int prevPackRowLength = GL11.glGetInteger(GL11.GL_PACK_ROW_LENGTH);
+        int prevPackSkipPixels = GL11.glGetInteger(GL11.GL_PACK_SKIP_PIXELS);
+        int prevPackSkipRows = GL11.glGetInteger(GL11.GL_PACK_SKIP_ROWS);
+        int prevPackAlignment = GL11.glGetInteger(GL11.GL_PACK_ALIGNMENT);
 
-        GL11.glReadPixels(x, y, width, height, GL11.GL_RGBA, GL11.GL_FLOAT, pixelData);
-        pixelData.rewind();
-
-        int[] pixels = new int[width * height];
-
-        for (int i = 0; i < height; ++i)
+        try
         {
-            for (int j = 0; j < width; ++j)
+            GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, 0);
+            GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, 0);
+            GL11.glPixelStorei(GL11.GL_PACK_SKIP_PIXELS, 0);
+            GL11.glPixelStorei(GL11.GL_PACK_SKIP_ROWS, 0);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 4);
+
+            FloatBuffer pixelData = BufferUtils.createFloatBuffer(width * height * 4);
+
+            GL11.glReadPixels(x, y, width, height, GL11.GL_RGBA, GL11.GL_FLOAT, pixelData);
+            pixelData.rewind();
+
+            int[] pixels = new int[width * height];
+
+            for (int i = 0; i < height; ++i)
             {
-                float r = pixelData.get() * 255;
-                float g = pixelData.get() * 255;
-                float b = pixelData.get() * 255;
-                float a = pixelData.get() * 255;
-                int k = ((height - 1) - i) * width + j;
+                for (int j = 0; j < width; ++j)
+                {
+                    float r = pixelData.get() * 255;
+                    float g = pixelData.get() * 255;
+                    float b = pixelData.get() * 255;
+                    float a = pixelData.get() * 255;
+                    int k = ((height - 1) - i) * width + j;
 
-                pixels[k] = ((int) a << 24) + ((int) r << 16) + ((int) g << 8) + (int) b;
+                    pixels[k] = ((int) a << 24) + ((int) r << 16) + ((int) g << 8) + (int) b;
+                }
             }
-        }
 
-        if (!this.isThumbnailPixelDataValid(pixels))
+            if (!this.isThumbnailPixelDataValid(pixels))
+            {
+                if (onComplete != null)
+                {
+                    onComplete.run();
+                }
+
+                return;
+            }
+
+            new Thread(() ->
+            {
+                new ScreenshotRecorder.ScreenshotRunner(width, height, pixels, output).run();
+
+                if (onComplete != null)
+                {
+                    MinecraftClient.getInstance().execute(onComplete);
+                }
+            }).start();
+        }
+        catch (Exception e)
         {
+            e.printStackTrace();
+
             if (onComplete != null)
             {
                 onComplete.run();
             }
-
-            return;
         }
-
-        new Thread(() ->
+        finally
         {
-            new ScreenshotRecorder.ScreenshotRunner(width, height, pixels, output).run();
-
-            if (onComplete != null)
-            {
-                MinecraftClient.getInstance().execute(onComplete);
-            }
-        }).start();
+            GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, prevPbo);
+            GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, prevPackRowLength);
+            GL11.glPixelStorei(GL11.GL_PACK_SKIP_PIXELS, prevPackSkipPixels);
+            GL11.glPixelStorei(GL11.GL_PACK_SKIP_ROWS, prevPackSkipRows);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, prevPackAlignment);
+        }
     }
 
     private boolean isThumbnailPixelDataValid(int[] pixels)

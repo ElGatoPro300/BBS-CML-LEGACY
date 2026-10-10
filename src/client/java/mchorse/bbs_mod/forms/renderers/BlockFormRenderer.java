@@ -2,6 +2,7 @@ package mchorse.bbs_mod.forms.renderers;
 
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
+import mchorse.bbs_mod.client.BBSUniform;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.forms.CustomVertexConsumerProvider;
 import mchorse.bbs_mod.forms.FormUtilsClient;
@@ -14,7 +15,6 @@ import mchorse.bbs_mod.forms.renderers.utils.BlockEffectOverlayUniforms;
 import mchorse.bbs_mod.forms.renderers.utils.FormColorEffects;
 import mchorse.bbs_mod.forms.renderers.utils.FormLightingRender;
 import mchorse.bbs_mod.forms.renderers.utils.FormOutlinePass;
-import mchorse.bbs_mod.forms.renderers.utils.GlowEmissionVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.StructureData;
 import mchorse.bbs_mod.forms.renderers.utils.VirtualBlockRenderView;
 import mchorse.bbs_mod.ui.framework.UIContext;
@@ -30,7 +30,9 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BlockRenderLayers;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.OverlayVertexConsumer;
@@ -39,11 +41,16 @@ import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.TexturedRenderLayers;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRenderDispatcher;
+import net.minecraft.client.render.block.BlockModelRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.model.BakedModel;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.RenderDispatcher;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.render.model.ModelBaker;
+import net.minecraft.client.render.state.CameraRenderState;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
@@ -51,6 +58,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.EmptyBlockView;
@@ -59,9 +67,9 @@ import net.minecraft.world.World;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.joml.Vector4f;
 
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import org.lwjgl.opengl.GL11;
@@ -87,10 +95,10 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
     @Override
     public void renderInUI(UIContext context, int x1, int y1, int x2, int y2)
     {
-        context.batcher.getContext().draw();
+        context.batcher.flush();
 
         CustomVertexConsumerProvider consumers = FormUtilsClient.getProvider();
-        MatrixStack matrices = context.batcher.getContext().getMatrices();
+        MatrixStack matrices = new MatrixStack();
 
         Matrix4f uiMatrix = ModelFormRenderer.getUIMatrix(context, x1, y1, x2, y2);
 
@@ -141,9 +149,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             this.applyBlockMainPassHijackLayer(layer, uiNegativeGlowTint);
         });
 
-        Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
-        Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
-        RenderSystem.setupLevelDiffuseLighting(light0, light1);
+        BBSRendering.setupLevelLighting();
 
         Color mainPassPaint = FormColorEffects.defersNegativePaintToOverlay(this.form.paintSettings.get(), this.form.paintColor.get())
             ? null
@@ -154,7 +160,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
         this.renderRepeatedBlocks(null, matrices, consumers, LightmapTextureManager.MAX_BLOCK_LIGHT_COORDINATE, OverlayTexture.DEFAULT_UV, false, true, false, false, false);
 
         consumers.draw();
-        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
         CustomVertexConsumerProvider.clearRunnables();
 
         boolean runPaintOverlay = FormColorEffects.wantsPaintOverlay(this.form.paintSettings.get(), this.form.paintColor.get());
@@ -182,10 +188,6 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
         consumers.setUI(false);
         consumers.setSubstitute(null);
-        CustomVertexConsumerProvider.clearRunnables();
-
-        DiffuseLighting.disableGuiDepthLighting();
-
         matrices.pop();
     }
 
@@ -217,11 +219,14 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             {
                 CustomVertexConsumerProvider.hijackVertexFormat((layer) ->
                 {
-                    this.setupTarget(context, BBSShaders.getPickerModelsProgram());
-                    RenderSystem.setShader(BBSShaders.getPickerModelsProgram());
-                    RenderSystem.setShaderTexture(0, SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+                    ShaderProgram picker = BBSShaders.getPickerModelsProgram();
+
+                    this.setupTarget(context, picker);
+                    BBSUniform.set(picker, "IgnoreLightmap", 1);
+                    BBSRendering.bindProgram(picker);
+                    BBSRendering.bindTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
                     /* Unit pick cubes need both faces; culling clipped the volume to a flat slab. */
-                    RenderSystem.disableCull();
+                    BBSRendering.disableCull();
                 });
 
                 light = 0;
@@ -393,8 +398,8 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
                     CustomVertexConsumerProvider deferredConsumers = FormUtilsClient.getProvider();
 
-                    RenderSystem.enableDepthTest();
-                    RenderSystem.depthMask(depthWrite);
+                    BBSRendering.enableDepthTest();
+                    BBSRendering.depthMask(depthWrite);
                     ShaderOpacityPatch.reassertPostDeferredDepthState(depthWrite);
                     CustomVertexConsumerProvider.hijackVertexFormat((layer) ->
                     {
@@ -409,12 +414,12 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                         }
                         else
                         {
-                            RenderSystem.enableBlend();
-                            RenderSystem.defaultBlendFunc();
+                            BBSRendering.enableBlend();
+                            BBSRendering.defaultBlendFunc();
                             /* Same as Structure soft: never leave a leftover ColorModulator. */
-                            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+                            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
                         }
-                        RenderSystem.depthMask(depthWrite);
+                        BBSRendering.depthMask(depthWrite);
                         ShaderOpacityPatch.reassertPostDeferredDepthState(depthWrite);
                     });
 
@@ -429,7 +434,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                     {
                         if (blockShaderTintSnapshot != null)
                         {
-                            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+                            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
                         }
 
                         deferredConsumers.setSubstitute(null);
@@ -455,10 +460,10 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                     }
 
                     /* Soft flush isolation — glow leaves additive blend / depthMask false. */
-                    RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-                    RenderSystem.defaultBlendFunc();
+                    BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+                    BBSRendering.defaultBlendFunc();
                     CustomVertexConsumerProvider.clearRunnables();
-                    RenderSystem.depthMask(depthWrite);
+                    BBSRendering.depthMask(depthWrite);
                     ShaderOpacityPatch.reassertPostDeferredDepthState(depthWrite);
                 };
 
@@ -501,7 +506,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                     {
                         /* Recolor already has form opacity; leftover ColorModulator.a would square
                          * Bayer dither (same as soft Structure leaves / negative paint). */
-                        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+                        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
                         ShaderOpacityPatch.uploadShadowFormUniform();
                     });
                 }
@@ -520,7 +525,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
                     if (blockShaderTint != null)
                     {
-                        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+                        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
                     }
 
                     consumers.setSubstitute(null);
@@ -574,25 +579,26 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                 this.renderOutline(context, color.a, light, context.overlay);
             }
 
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.defaultBlendFunc();
         }
         finally
         {
             this.blockMainPassGlowEmission = null;
             CustomVertexConsumerProvider.clearRunnables();
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
             /* Keep the shared ItemForm scratch neutral after BE/atlas color bake. */
             color.set(1F, 1F, 1F, 1F);
 
             if (context.isPicking())
             {
-                RenderSystem.enableCull();
+                BBSUniform.set(BBSShaders.getPickerModelsProgram(), "IgnoreLightmap", 0);
+                BBSRendering.enableCull();
             }
 
             context.stack.pop();
         }
 
-        RenderSystem.enableDepthTest();
+        BBSRendering.enableDepthTest();
     }
 
     private void renderOutline(FormRenderingContext context, float formAlpha, int light, int overlay)
@@ -603,7 +609,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
             CustomVertexConsumerProvider.hijackVertexFormat((layer) ->
             {
-                RenderSystem.setShader(BBSShaders.getOutlineMask());
+                BBSRendering.bindProgram(BBSShaders.getOutlineMask());
             });
 
             try
@@ -625,8 +631,8 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             return;
         }
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        BBSRendering.enableBlend();
+        BBSRendering.defaultBlendFunc();
 
         if (shaderTint != null)
         {
@@ -634,11 +640,11 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
              * stay 1 — soft/form opacity is already in the vertex recolor. Matching StructureForm
              * soft bloom; using shaderTint.a here squared opacity and caused a sudden darkening
              * when glow > 0. */
-            RenderSystem.setShaderColor(shaderTint.r, shaderTint.g, shaderTint.b, 1F);
+            BBSRendering.setShaderColor(shaderTint.r, shaderTint.g, shaderTint.b, 1F);
         }
         else
         {
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
         }
     }
 
@@ -821,7 +827,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
         if (translucent)
         {
             savedDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-            RenderSystem.depthMask(false);
+            BBSRendering.depthMask(false);
         }
 
         try
@@ -885,7 +891,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
         {
             if (translucent)
             {
-                RenderSystem.depthMask(savedDepthMask);
+                BBSRendering.depthMask(savedDepthMask);
             }
         }
 
@@ -894,17 +900,16 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
     private void renderBlockModel(BlockState blockState, MatrixStack stack, CustomVertexConsumerProvider consumers, int light, int overlay, BlockPos worldPos)
     {
-        BakedModel bakedModel = MinecraftClient.getInstance().getBlockRenderManager().getModel(blockState);
+        BlockStateModel model = MinecraftClient.getInstance().getBlockRenderManager().getModel(blockState);
         int tint = this.resolveBlockTint(blockState, worldPos);
         float r = (float) (tint >> 16 & 0xFF) / 255.0F;
         float g = (float) (tint >> 8 & 0xFF) / 255.0F;
         float b = (float) (tint & 0xFF) / 255.0F;
 
-        MinecraftClient.getInstance().getBlockRenderManager().getModelRenderer().render(
+        BlockModelRenderer.render(
             stack.peek(),
             consumers.getBuffer(this.resolveBlockLayer(blockState)),
-            blockState,
-            bakedModel,
+            model,
             r,
             g,
             b,
@@ -916,14 +921,14 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
     private RenderLayer resolveBlockLayer(BlockState state)
     {
         StructureData.syncFancyGraphicsFromOptions();
-        RenderLayer base = RenderLayers.getBlockLayer(state);
+        BlockRenderLayer base = BlockRenderLayers.getBlockLayer(state);
 
-        if (base == RenderLayer.getSolid())
+        if (base == BlockRenderLayer.SOLID)
         {
             return TexturedRenderLayers.getEntitySolid();
         }
 
-        return RenderLayers.getEntityBlockLayer(state);
+        return BlockRenderLayers.getEntityBlockLayer(state);
     }
 
     private int resolveBlockTint(BlockState state, BlockPos worldPos)
@@ -966,9 +971,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             return false;
         }
 
-        RenderLayer layer = RenderLayers.getBlockLayer(state);
-
-        return layer == RenderLayer.getTranslucent() || layer == RenderLayer.getTripwire();
+        return BlockRenderLayers.getBlockLayer(state).isTranslucent();
     }
 
     /**
@@ -1054,10 +1057,10 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
      */
     private void renderPickVolume(MatrixStack stack, CustomVertexConsumerProvider consumers, int light, int overlay)
     {
-        RenderSystem.setShaderTexture(0, SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        RenderSystem.disableCull();
+        BBSRendering.bindTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        BBSRendering.disableCull();
 
-        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getEntitySolid(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE));
+        VertexConsumer buffer = consumers.getBuffer(RenderLayers.entitySolid(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE));
         MatrixStack.Entry entry = stack.peek();
         Matrix4f matrix = entry.getPositionMatrix();
         float[] uv = this.getOpaquePickUv();
@@ -1113,10 +1116,10 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             }
         }
 
-        RenderSystem.setShaderTexture(0, SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        RenderSystem.disableCull();
+        BBSRendering.bindTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        BBSRendering.disableCull();
 
-        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getEntitySolid(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE));
+        VertexConsumer buffer = consumers.getBuffer(RenderLayers.entitySolid(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE));
         MatrixStack.Entry entry = stack.peek();
         Matrix4f matrix = entry.getPositionMatrix();
         float[] uv = this.getOpaquePickUv();
@@ -1126,8 +1129,8 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
     private float[] getOpaquePickUv()
     {
-        Sprite sprite = MinecraftClient.getInstance().getBakedModelManager()
-            .getAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)
+        Sprite sprite = MinecraftClient.getInstance().getAtlasManager()
+            .getAtlasTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)
             .getSprite(Identifier.of("minecraft", "block/white_concrete"));
         float u = (sprite.getMinU() + sprite.getMaxU()) * 0.5F;
         float v = (sprite.getMinV() + sprite.getMaxV()) * 0.5F;
@@ -1353,7 +1356,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
         max.set(0F, 0F, 0F);
 
         MinecraftClient client = MinecraftClient.getInstance();
-        BakedModel model = client.getBlockRenderManager().getModels().getModel(state);
+        BlockStateModel model = client.getBlockRenderManager().getModels().getModel(state);
 
         if (model == null)
         {
@@ -1363,17 +1366,20 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
         boolean found = false;
         Random random = Random.create(42L);
 
-        for (Direction direction : Direction.values())
+        for (BlockModelPart part : model.getParts(random))
         {
-            for (BakedQuad quad : model.getQuads(state, direction, random))
+            for (Direction direction : Direction.values())
+            {
+                for (BakedQuad quad : part.getQuads(direction))
+                {
+                    found = this.expandBoundsFromQuad(quad, min, max) || found;
+                }
+            }
+
+            for (BakedQuad quad : part.getQuads(null))
             {
                 found = this.expandBoundsFromQuad(quad, min, max) || found;
             }
-        }
-
-        for (BakedQuad quad : model.getQuads(state, null, random))
-        {
-            found = this.expandBoundsFromQuad(quad, min, max) || found;
         }
 
         return found;
@@ -1381,29 +1387,18 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
     private boolean expandBoundsFromQuad(BakedQuad quad, Vector3f min, Vector3f max)
     {
-        int[] data = quad.getVertexData();
-        int stride = Math.max(data.length / 4, 3);
         boolean found = false;
 
         for (int v = 0; v < 4; v++)
         {
-            int base = v * stride;
+            Vector3fc pos = quad.getPosition(v);
 
-            if (base + 2 >= data.length)
-            {
-                continue;
-            }
-
-            float x = Float.intBitsToFloat(data[base]);
-            float y = Float.intBitsToFloat(data[base + 1]);
-            float z = Float.intBitsToFloat(data[base + 2]);
-
-            min.x = Math.min(min.x, x);
-            min.y = Math.min(min.y, y);
-            min.z = Math.min(min.z, z);
-            max.x = Math.max(max.x, x);
-            max.y = Math.max(max.y, y);
-            max.z = Math.max(max.z, z);
+            min.x = Math.min(min.x, pos.x());
+            min.y = Math.min(min.y, pos.y());
+            min.z = Math.min(min.z, pos.z());
+            max.x = Math.max(max.x, pos.x());
+            max.y = Math.max(max.y, pos.y());
+            max.z = Math.max(max.z, pos.z());
             found = true;
         }
 
@@ -1473,7 +1468,7 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
                 RenderSystem.getModelViewStack().popMatrix();
                 MatrixStackUtils.applyModelViewMatrix();
                 consumers.setSubstitute(null);
-                RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+                BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
             }
         });
     }
@@ -1536,8 +1531,8 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             blockEntity.setWorld(client.world);
         }
 
-        BlockEntityRenderDispatcher dispatcher = client.getBlockEntityRenderDispatcher();
-        BlockEntityRenderer<?> renderer = dispatcher.get(blockEntity);
+        BlockEntityRenderManager dispatcher = client.getBlockEntityRenderDispatcher();
+        BlockEntityRenderer<?, ?> renderer = dispatcher.get(blockEntity);
 
         if (renderer == null)
         {
@@ -1546,49 +1541,31 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
         @SuppressWarnings({"rawtypes", "unchecked"})
         BlockEntityRenderer raw = (BlockEntityRenderer) renderer;
-        Function<VertexConsumer, VertexConsumer> previousSubstitute = consumers.getSubstitute();
+        BlockEntityRenderState state = raw.createRenderState();
+
+        raw.updateRenderState(blockEntity, state, 0F, Vec3d.ZERO, null);
+        state.lightmapCoordinates = light;
+
         Color beTint = this.resolveBlockEntityColor();
         boolean applyTint = !effectOverlay;
-        Color glowEmissionBake = !forceTint && !effectOverlay ? this.blockMainPassGlowEmission : null;
-        boolean glowEmissionBakeActive = glowEmissionBake != null;
 
         try
         {
+            RenderDispatcher renderDispatcher = client.gameRenderer.getEntityRenderDispatcher();
+            CameraRenderState cameraRenderState = new CameraRenderState();
+
+            raw.render(state, stack, renderDispatcher.getQueue(), cameraRenderState);
+
             if (applyTint)
             {
-                if (glowEmissionBakeActive)
-                {
-                    Function<VertexConsumer, VertexConsumer> glowWrap = BBSRendering.getGlowOverlayConsumer(glowEmissionBake);
-                    Function<VertexConsumer, VertexConsumer> colorWrap = BBSRendering.getColorConsumer(beTint);
-
-                    consumers.setSubstitute((vertexConsumer) -> glowWrap.apply(colorWrap.apply(vertexConsumer)));
-                }
-                else
-                {
-                    consumers.setSubstitute(BBSRendering.getColorConsumer(beTint));
-                }
-
-                RenderSystem.setShaderColor(beTint.r, beTint.g, beTint.b, beTint.a);
-            }
-            else if (glowEmissionBakeActive)
-            {
-                Function<VertexConsumer, VertexConsumer> parentSub = previousSubstitute != null ? previousSubstitute : Function.identity();
-                Function<VertexConsumer, VertexConsumer> glowWrap = BBSRendering.getGlowOverlayConsumer(glowEmissionBake);
-
-                consumers.setSubstitute((vertexConsumer) -> glowWrap.apply(parentSub.apply(vertexConsumer)));
+                BBSRendering.setShaderColor(beTint.r, beTint.g, beTint.b, beTint.a);
             }
 
-            raw.render(blockEntity, 0F, stack, consumers, light, overlay);
+            renderDispatcher.render();
         }
         finally
         {
-            if (glowEmissionBakeActive)
-            {
-                GlowEmissionVertexConsumer.emissionColor = null;
-            }
-
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            consumers.setSubstitute(previousSubstitute);
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
         }
     }
 
@@ -1653,10 +1630,10 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             }
         });
 
-        RenderSystem.enableBlend();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.depthMask(false);
+        BBSRendering.enableBlend();
+        BBSRendering.enableDepthTest();
+        BBSRendering.depthFunc(GL11.GL_LEQUAL);
+        BBSRendering.depthMask(false);
         /* Pull tint overlay toward camera so it does not z-fight the main block pass. */
         GL11.glEnable(GL11.GL_POLYGON_OFFSET_FILL);
         GL11.glPolygonOffset(-1F, -2F);
@@ -1676,8 +1653,8 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             this.endBlockVisualMaskSize(entityVisual);
 
             consumers.setSubstitute(null);
-            RenderSystem.depthMask(savedDepthMask);
-            RenderSystem.depthFunc(savedDepthFunc);
+            BBSRendering.depthMask(savedDepthMask);
+            BBSRendering.depthFunc(savedDepthFunc);
             GL11.glPolygonOffset(0F, 0F);
 
             if (savedPolygonOffsetFill)
@@ -1691,15 +1668,15 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
             if (savedCull)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
 
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.defaultBlendFunc();
             CustomVertexConsumerProvider.clearRunnables();
         }
     }
@@ -1812,23 +1789,23 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             }
         });
 
-        RenderSystem.enableBlend();
+        BBSRendering.enableBlend();
 
         if (darken)
         {
-            RenderSystem.blendFuncSeparate(
-                GlStateManager.SrcFactor.DST_COLOR,
-                GlStateManager.DstFactor.ZERO,
-                GlStateManager.SrcFactor.DST_ALPHA,
-                GlStateManager.DstFactor.ZERO
+            BBSRendering.blendFuncSeparate(
+                GL11.GL_DST_COLOR,
+                GL11.GL_ZERO,
+                GL11.GL_DST_ALPHA,
+                GL11.GL_ZERO
             );
         }
         else
         {
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            BBSRendering.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         }
 
-        RenderSystem.depthMask(false);
+        BBSRendering.depthMask(false);
 
         consumers.setSubstitute(BBSRendering.getBlockPaintOverlayConsumer(paintOverlay));
 
@@ -1844,19 +1821,19 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             this.endBlockVisualMaskSize(entityVisual);
 
             consumers.setSubstitute(null);
-            RenderSystem.depthMask(true);
+            BBSRendering.depthMask(true);
 
             if (savedCull)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
 
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.defaultBlendFunc();
             CustomVertexConsumerProvider.clearRunnables();
         }
     }
@@ -1948,9 +1925,9 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
             GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
         });
 
-        RenderSystem.enableBlend();
-        RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-        RenderSystem.depthMask(false);
+        BBSRendering.enableBlend();
+        BBSRendering.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
+        BBSRendering.depthMask(false);
 
         boolean wasOffset = GL11.glGetBoolean(GL11.GL_POLYGON_OFFSET_FILL);
         if (wasOffset) GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
@@ -1976,19 +1953,19 @@ public class BlockFormRenderer extends FormRenderer<BlockForm>
 
             consumers.setUI(false);
             consumers.setSubstitute(null);
-            RenderSystem.depthMask(true);
+            BBSRendering.depthMask(true);
 
             if (savedCull)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
 
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
+            BBSRendering.defaultBlendFunc();
             CustomVertexConsumerProvider.clearRunnables();
         }
     }

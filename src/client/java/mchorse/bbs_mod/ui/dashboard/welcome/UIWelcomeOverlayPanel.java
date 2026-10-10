@@ -12,9 +12,7 @@ import mchorse.bbs_mod.ui.utils.UIUtils;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.colors.Colors;
 
-import net.minecraft.client.util.math.MatrixStack;
-
-import com.mojang.blaze3d.systems.RenderSystem;
+import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -287,12 +285,9 @@ public class UIWelcomeOverlayPanel extends UIElement
                 float cardAlpha = reveal;
                 float dy = (1.0F - reveal) * 16.0F;
 
-                MatrixStack matrices = context.batcher.getContext().getMatrices();
-                matrices.push();
-                matrices.translate(0F, dy, 0F);
-
-                RenderSystem.enableBlend();
-                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, cardAlpha);
+                Matrix3x2fStack matrices = context.batcher.getContext().getMatrices();
+                matrices.pushMatrix();
+                matrices.translate(0F, dy);
 
                 int cardBg = ((int) (0xb8 * cardAlpha) << 24) | 0x090c14;
                 context.batcher.box(this.slideContainer.area.x, this.slideContainer.area.y,
@@ -303,8 +298,7 @@ public class UIWelcomeOverlayPanel extends UIElement
 
                 super.render(context);
 
-                matrices.pop();
-                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+                matrices.popMatrix();
             }
 
             this.intro.area.copy(this.area);
@@ -330,14 +324,11 @@ public class UIWelcomeOverlayPanel extends UIElement
                 float cx = this.slideContainer.area.mx();
                 float cy = this.slideContainer.area.my();
 
-                MatrixStack matrices = context.batcher.getContext().getMatrices();
-                matrices.push();
-                matrices.translate(cx, cy, 0F);
-                matrices.scale(scale, scale, 1.0F);
-                matrices.translate(-cx, -cy + dy, 0F);
-
-                RenderSystem.enableBlend();
-                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, Math.max(0.0F, cardAlpha));
+                Matrix3x2fStack matrices = context.batcher.getContext().getMatrices();
+                matrices.pushMatrix();
+                matrices.translate(cx, cy);
+                matrices.scale(scale, scale);
+                matrices.translate(-cx, -cy + dy);
 
                 int cardBg = ((int) (0xb8 * cardAlpha) << 24) | 0x090c14;
                 context.batcher.box(this.slideContainer.area.x, this.slideContainer.area.y,
@@ -348,8 +339,7 @@ public class UIWelcomeOverlayPanel extends UIElement
 
                 super.render(context);
 
-                matrices.pop();
-                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+                matrices.popMatrix();
             }
         }
         else

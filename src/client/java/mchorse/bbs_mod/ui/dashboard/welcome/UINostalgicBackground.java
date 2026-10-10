@@ -1,18 +1,8 @@
 package mchorse.bbs_mod.ui.dashboard.welcome;
 
+import mchorse.bbs_mod.graphics.GuiQuadMesh;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.utils.Area;
-
-import net.minecraft.client.gl.ShaderProgramKeys;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
-
-import org.joml.Matrix4f;
-
-import com.mojang.blaze3d.systems.RenderSystem;
 
 import java.util.Random;
 
@@ -163,34 +153,30 @@ public class UINostalgicBackground
         long now = System.currentTimeMillis();
         float timeSec = (now % 10000000L) / 1000F;
 
-        Matrix4f mat = context.batcher.getContext().getMatrices().peek().getPositionMatrix();
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        GuiQuadMesh mesh = new GuiQuadMesh();
 
         /* 1. Deep Cosmic Void Background */
-        this.renderCosmicVoid(builder, mat, area, energy);
+        this.renderCosmicVoid(mesh, area, energy);
 
         /* 2. Glowing Emission & Reflection Nebulae (Amber / Crimson / Cyan clouds) */
-        this.renderNebulaGlowPools(builder, mat, area, energy, timeSec);
+        this.renderNebulaGlowPools(mesh, area, energy, timeSec);
 
         /* 3. Towering Pillars of Creation (Cosmic dust columns) */
-        this.renderNebulaPillars(builder, mat, area, energy, timeSec);
+        this.renderNebulaPillars(mesh, area, energy, timeSec);
 
         /* 4. Twinkling Starfield */
-        this.renderStarfield(builder, mat, area, energy, timeSec);
+        this.renderStarfield(mesh, area, energy, timeSec);
 
         /* 5. Hero Stars with Diffraction Spikes */
-        this.renderHeroStars(builder, mat, area, energy, timeSec);
+        this.renderHeroStars(mesh, area, energy, timeSec);
 
         /* 6. Center Nebula Shadow for UI Readability */
-        this.renderCenterShadow(builder, mat, area, energy);
+        this.renderCenterShadow(mesh, area, energy);
 
         /* 7. Drifting Cosmic Stardust & Cursor Aura */
-        this.renderCosmicDust(builder, mat, area, particleEnergy, timeSec, context);
+        this.renderCosmicDust(mesh, area, particleEnergy, timeSec, context);
 
-        RenderSystem.enableBlend();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        context.batcher.getContext().draw();
-        drawBufferIfNotEmpty(builder);
+        context.batcher.drawQuadMesh(mesh);
     }
 
     private void updateParallax(UIContext context, Area area)
@@ -212,7 +198,7 @@ public class UINostalgicBackground
         this.parallaxY += (targetY - this.parallaxY) * smoothFactor;
     }
 
-    private void renderCosmicVoid(BufferBuilder builder, Matrix4f mat, Area area, float energy)
+    private void renderCosmicVoid(GuiQuadMesh mesh, Area area, float energy)
     {
         int a = (int) (0xFF * energy);
         int spaceTop = (a << 24) | 0x08040d;
@@ -221,11 +207,11 @@ public class UINostalgicBackground
 
         int midY = area.y + (int) (area.h * 0.48F);
 
-        pushQuadPoints(builder, mat, area.x, area.y, area.ex(), midY, spaceTop, spaceTop, spaceMid, spaceMid);
-        pushQuadPoints(builder, mat, area.x, midY, area.ex(), area.ey(), spaceMid, spaceMid, spaceBot, spaceBot);
+        pushQuadPoints(mesh, area.x, area.y, area.ex(), midY, spaceTop, spaceTop, spaceMid, spaceMid);
+        pushQuadPoints(mesh, area.x, midY, area.ex(), area.ey(), spaceMid, spaceMid, spaceBot, spaceBot);
     }
 
-    private void renderNebulaGlowPools(BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec)
+    private void renderNebulaGlowPools(GuiQuadMesh mesh, Area area, float energy, float timeSec)
     {
         float pX = this.parallaxX * 12F;
         float pY = this.parallaxY * 8F;
@@ -237,9 +223,9 @@ public class UINostalgicBackground
         int roseGlow = (orangeAlpha << 24) | 0xcc2255;
         int goldGlow = ((orangeAlpha * 2 / 3) << 24) | 0xffaa33;
 
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.35F + pX, area.y + area.h * 0.15F + pY, area.h * 0.55F, orangeGlow);
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.65F + pX, area.y + area.h * 0.12F + pY, area.h * 0.60F, roseGlow);
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.85F + pX, area.y + area.h * 0.22F + pY, area.h * 0.45F, goldGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.35F + pX, area.y + area.h * 0.15F + pY, area.h * 0.55F, orangeGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.65F + pX, area.y + area.h * 0.12F + pY, area.h * 0.60F, roseGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.85F + pX, area.y + area.h * 0.22F + pY, area.h * 0.45F, goldGlow);
 
         /* 2. Deep Interstellar Teal / Cyan / Violet Reflection Gas Pools */
         int cyanAlpha = (int) (0x38 * energy * breath);
@@ -247,12 +233,12 @@ public class UINostalgicBackground
         int indigoGlow = (cyanAlpha << 24) | 0x332266;
         int violetGlow = (cyanAlpha << 24) | 0x551848;
 
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.18F + pX, area.y + area.h * 0.65F + pY, area.h * 0.50F, cyanGlow);
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.55F + pX, area.y + area.h * 0.78F + pY, area.h * 0.55F, indigoGlow);
-        pushSmoothRadialGlow(builder, mat, area.x + area.w * 0.82F + pX, area.y + area.h * 0.60F + pY, area.h * 0.45F, violetGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.18F + pX, area.y + area.h * 0.65F + pY, area.h * 0.50F, cyanGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.55F + pX, area.y + area.h * 0.78F + pY, area.h * 0.55F, indigoGlow);
+        pushSmoothRadialGlow(mesh, area.x + area.w * 0.82F + pX, area.y + area.h * 0.60F + pY, area.h * 0.45F, violetGlow);
     }
 
-    private void renderNebulaPillars(BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec)
+    private void renderNebulaPillars(GuiQuadMesh mesh, Area area, float energy, float timeSec)
     {
         /* Towering diagonal dust columns rising from bottom-left to center-right */
         float pX = this.parallaxX * 20F;
@@ -260,7 +246,7 @@ public class UINostalgicBackground
 
         /* Pillar 1: Giant Central Pillar */
         this.renderSinglePillar(
-            builder, mat, area, energy, timeSec,
+            mesh, area, energy, timeSec,
             area.x + area.w * 0.12F + pX, area.ey() + 20F + pY,
             area.x + area.w * 0.58F + pX, area.y + area.h * 0.14F + pY,
             48F, 18F, 0xee7733, 0x33bbee
@@ -268,7 +254,7 @@ public class UINostalgicBackground
 
         /* Pillar 2: Right Companion Finger */
         this.renderSinglePillar(
-            builder, mat, area, energy, timeSec,
+            mesh, area, energy, timeSec,
             area.x + area.w * 0.38F + pX, area.ey() + 20F + pY,
             area.x + area.w * 0.78F + pX, area.y + area.h * 0.38F + pY,
             38F, 14F, 0xdd6622, 0x44ddff
@@ -276,7 +262,7 @@ public class UINostalgicBackground
 
         /* Pillar 3: Left Secondary Spire */
         this.renderSinglePillar(
-            builder, mat, area, energy, timeSec,
+            mesh, area, energy, timeSec,
             area.x - 10F + pX, area.ey() + 20F + pY,
             area.x + area.w * 0.22F + pX, area.y + area.h * 0.52F + pY,
             35F, 12F, 0xbb5533, 0x33aadd
@@ -284,7 +270,7 @@ public class UINostalgicBackground
     }
 
     private void renderSinglePillar(
-        BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec,
+        GuiQuadMesh mesh, Area area, float energy, float timeSec,
         float x1, float y1, float x2, float y2, float baseWidth, float tipWidth,
         int rimGlowColor, int tipIonColor
     )
@@ -311,7 +297,7 @@ public class UINostalgicBackground
 
             /* Pillar core */
             pushQuadSkewed(
-                builder, mat,
+                mesh,
                 prevCX - prevW * 0.5F, prevCY, prevCX + prevW * 0.5F, prevCY,
                 curCX - curW * 0.5F, curCY, curCX + curW * 0.5F, curCY,
                 coreDark, coreDark, coreMid, coreMid
@@ -319,14 +305,14 @@ public class UINostalgicBackground
 
             /* Illuminated glowing outer dust rim */
             pushQuadSkewed(
-                builder, mat,
+                mesh,
                 prevCX - prevW * 0.5F - 10F, prevCY, prevCX - prevW * 0.5F, prevCY,
                 curCX - curW * 0.5F - 8F, curCY, curCX - curW * 0.5F, curCY,
                 0, rimColor, 0, rimColor
             );
 
             pushQuadSkewed(
-                builder, mat,
+                mesh,
                 prevCX + prevW * 0.5F, prevCY, prevCX + prevW * 0.5F + 10F, prevCY,
                 curCX + curW * 0.5F, curCY, curCX + curW * 0.5F + 8F, curCY,
                 rimColor, 0, rimColor, 0
@@ -338,10 +324,10 @@ public class UINostalgicBackground
         }
 
         /* Glowing ionization fingertip at pillar summit */
-        pushSmoothRadialGlow(builder, mat, x2, y2, tipWidth * 2.2F, tipGlow);
+        pushSmoothRadialGlow(mesh, x2, y2, tipWidth * 2.2F, tipGlow);
     }
 
-    private void renderStarfield(BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec)
+    private void renderStarfield(GuiQuadMesh mesh, Area area, float energy, float timeSec)
     {
         for (int i = 0; i < STAR_COUNT; i++)
         {
@@ -364,11 +350,11 @@ public class UINostalgicBackground
             int color = (aInt << 24) | s.color;
             float sz = s.size;
 
-            pushQuad(builder, mat, x - sz * 0.5F, y - sz * 0.5F, sz, sz, color, color, color, color);
+            pushQuad(mesh, x - sz * 0.5F, y - sz * 0.5F, sz, sz, color, color, color, color);
         }
     }
 
-    private void renderHeroStars(BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec)
+    private void renderHeroStars(GuiQuadMesh mesh, Area area, float energy, float timeSec)
     {
         for (int i = 0; i < HERO_STAR_COUNT; i++)
         {
@@ -386,27 +372,27 @@ public class UINostalgicBackground
             float r = hs.flareRadius;
 
             /* Soft radial halo */
-            pushSmoothRadialGlow(builder, mat, x, y, r * 0.75F, haloColor);
+            pushSmoothRadialGlow(mesh, x, y, r * 0.75F, haloColor);
 
             /* Bright Diamond Core */
-            pushQuad(builder, mat, x - 2F, y - 2F, 4F, 4F, starColor, starColor, starColor, starColor);
+            pushQuad(mesh, x - 2F, y - 2F, 4F, 4F, starColor, starColor, starColor, starColor);
 
             /* JWST Diffraction Cross Spikes */
             float spikeThickness = 0.8F;
 
             /* Horizontal spike */
-            pushQuadSkewed(builder, mat, x - r, y - spikeThickness, x + r, y - spikeThickness, x - r, y + spikeThickness, x + r, y + spikeThickness, 0, 0, spikeColor, spikeColor);
+            pushQuadSkewed(mesh, x - r, y - spikeThickness, x + r, y - spikeThickness, x - r, y + spikeThickness, x + r, y + spikeThickness, 0, 0, spikeColor, spikeColor);
 
             /* Vertical spike */
-            pushQuadSkewed(builder, mat, x - spikeThickness, y - r, x + spikeThickness, y - r, x - spikeThickness, y + r, x + spikeThickness, y + r, 0, 0, spikeColor, spikeColor);
+            pushQuadSkewed(mesh, x - spikeThickness, y - r, x + spikeThickness, y - r, x - spikeThickness, y + r, x + spikeThickness, y + r, 0, 0, spikeColor, spikeColor);
 
             /* Diagonal micro-spikes (45-degree angle) */
             float diagR = r * 0.45F;
-            pushQuad(builder, mat, x - diagR * 0.5F, y - diagR * 0.5F, diagR, diagR, haloColor, 0, 0, haloColor);
+            pushQuad(mesh, x - diagR * 0.5F, y - diagR * 0.5F, diagR, diagR, haloColor, 0, 0, haloColor);
         }
     }
 
-    private void renderCenterShadow(BufferBuilder builder, Matrix4f mat, Area area, float energy)
+    private void renderCenterShadow(GuiQuadMesh mesh, Area area, float energy)
     {
         /* Smooth center darkening ensuring high contrast for the onboarding card */
         int shadowAlpha = (int) (0x66 * energy);
@@ -414,11 +400,11 @@ public class UINostalgicBackground
         if (shadowAlpha > 0)
         {
             int shadowColor = (shadowAlpha << 24) | 0x020306;
-            pushSmoothRadialGlow(builder, mat, area.mx(), area.my(), area.w * 0.42F, shadowColor);
+            pushSmoothRadialGlow(mesh, area.mx(), area.my(), area.w * 0.42F, shadowColor);
         }
     }
 
-    private void renderCosmicDust(BufferBuilder builder, Matrix4f mat, Area area, float energy, float timeSec, UIContext context)
+    private void renderCosmicDust(GuiQuadMesh mesh, Area area, float energy, float timeSec, UIContext context)
     {
         if (energy <= 0.001F) return;
 
@@ -465,10 +451,10 @@ public class UINostalgicBackground
             if (sz > 1.6F)
             {
                 int haloColor = ((alphaInt / 3) << 24) | 0x77bbff;
-                pushQuad(builder, mat, x - 1.2F, y - 1.2F, sz + 2.4F, sz + 2.4F, haloColor, haloColor, haloColor, haloColor);
+                pushQuad(mesh, x - 1.2F, y - 1.2F, sz + 2.4F, sz + 2.4F, haloColor, haloColor, haloColor, haloColor);
             }
 
-            pushQuad(builder, mat, x, y, sz, sz, pColor, pColor, pColor, pColor);
+            pushQuad(mesh, x, y, sz, sz, pColor, pColor, pColor, pColor);
         }
 
         /* 2. Interactive Gravitational Lensing Halo under cursor */
@@ -480,46 +466,36 @@ public class UINostalgicBackground
             if (haloAlpha > 0)
             {
                 int haloColor = (haloAlpha << 24) | 0x44aaff;
-                pushSmoothRadialGlow(builder, mat, context.mouseX, context.mouseY, 85F, haloColor);
+                pushSmoothRadialGlow(mesh, context.mouseX, context.mouseY, 85F, haloColor);
             }
         }
     }
 
-    private static void drawBufferIfNotEmpty(BufferBuilder builder)
+    private static void pushQuad(GuiQuadMesh mesh, float x, float y, float w, float h, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        try
-        {
-            BufferRenderer.drawWithGlobalProgram(builder.end());
-        }
-        catch (IllegalStateException ignored)
-        {}
+        mesh.vertex(x, y, 0).color(cTopLeft);
+        mesh.vertex(x, y + h, 0).color(cBotLeft);
+        mesh.vertex(x + w, y + h, 0).color(cBotRight);
+        mesh.vertex(x + w, y, 0).color(cTopRight);
     }
 
-    private static void pushQuad(BufferBuilder builder, Matrix4f mat, float x, float y, float w, float h, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
+    private static void pushQuadPoints(GuiQuadMesh mesh, float x1, float y1, float x2, float y2, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        builder.vertex(mat, x, y, 0).color(cTopLeft);
-        builder.vertex(mat, x, y + h, 0).color(cBotLeft);
-        builder.vertex(mat, x + w, y + h, 0).color(cBotRight);
-        builder.vertex(mat, x + w, y, 0).color(cTopRight);
+        mesh.vertex(x1, y1, 0).color(cTopLeft);
+        mesh.vertex(x1, y2, 0).color(cBotLeft);
+        mesh.vertex(x2, y2, 0).color(cBotRight);
+        mesh.vertex(x2, y1, 0).color(cTopRight);
     }
 
-    private static void pushQuadPoints(BufferBuilder builder, Matrix4f mat, float x1, float y1, float x2, float y2, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
+    private static void pushQuadSkewed(GuiQuadMesh mesh, float xTL, float yTL, float xTR, float yTR, float xBL, float yBL, float xBR, float yBR, int cTL, int cTR, int cBL, int cBR)
     {
-        builder.vertex(mat, x1, y1, 0).color(cTopLeft);
-        builder.vertex(mat, x1, y2, 0).color(cBotLeft);
-        builder.vertex(mat, x2, y2, 0).color(cBotRight);
-        builder.vertex(mat, x2, y1, 0).color(cTopRight);
+        mesh.vertex(xTL, yTL, 0).color(cTL);
+        mesh.vertex(xBL, yBL, 0).color(cBL);
+        mesh.vertex(xBR, yBR, 0).color(cBR);
+        mesh.vertex(xTR, yTR, 0).color(cTR);
     }
 
-    private static void pushQuadSkewed(BufferBuilder builder, Matrix4f mat, float xTL, float yTL, float xTR, float yTR, float xBL, float yBL, float xBR, float yBR, int cTL, int cTR, int cBL, int cBR)
-    {
-        builder.vertex(mat, xTL, yTL, 0).color(cTL);
-        builder.vertex(mat, xBL, yBL, 0).color(cBL);
-        builder.vertex(mat, xBR, yBR, 0).color(cBR);
-        builder.vertex(mat, xTR, yTR, 0).color(cTR);
-    }
-
-    private static void pushSmoothRadialGlow(BufferBuilder builder, Matrix4f mat, float cx, float cy, float radius, int centerColor)
+    private static void pushSmoothRadialGlow(GuiQuadMesh mesh, float cx, float cy, float radius, int centerColor)
     {
         int maxAlpha = centerColor >>> 24;
         int rgb = centerColor & 0x00ffffff;
@@ -548,7 +524,7 @@ public class UINostalgicBackground
                     int cBL = ((int) (maxAlpha * wBL) << 24) | rgb;
                     int cBR = ((int) (maxAlpha * wBR) << 24) | rgb;
 
-                    pushQuad(builder, mat, x1, y1, step, step, cTL, cTR, cBL, cBR);
+                    pushQuad(mesh, x1, y1, step, step, cTL, cTR, cBL, cBR);
                 }
             }
         }

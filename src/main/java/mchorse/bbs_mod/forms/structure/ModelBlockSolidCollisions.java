@@ -395,7 +395,7 @@ public final class ModelBlockSolidCollisions
      */
     public static float boostStepHeight(Entity entity, float stepHeight)
     {
-        if (entity == null || entity.getWorld() == null)
+        if (entity == null || entity.getEntityWorld() == null)
         {
             return stepHeight;
         }
@@ -414,7 +414,7 @@ public final class ModelBlockSolidCollisions
 
         Box feet = entity.getBoundingBox();
         Box probe = feet.expand(0.4D, 0D, 0.4D).stretch(0D, CLIMB_STEP_HEIGHT + 0.05D, 0D);
-        World world = entity.getWorld();
+        World world = entity.getEntityWorld();
 
         for (ModelBlockEntity model : active)
         {

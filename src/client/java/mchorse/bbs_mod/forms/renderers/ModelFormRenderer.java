@@ -6,6 +6,7 @@ import mchorse.bbs_mod.bobj.BOBJBone;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.ItemUseRenderState;
+import mchorse.bbs_mod.client.render.ItemRenderHelper;
 import mchorse.bbs_mod.client.renderer.entity.ActorEntityRenderer;
 import mchorse.bbs_mod.cubic.IModel;
 import mchorse.bbs_mod.cubic.ModelInstance;
@@ -62,30 +63,22 @@ import mchorse.bbs_mod.utils.pose.PoseTransform;
 import mchorse.bbs_mod.utils.resources.LinkUtils;
 
 import net.minecraft.block.AbstractSkullBlock;
-import net.minecraft.block.SkullBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.DiffuseLighting;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.block.entity.SkullBlockEntityModel;
-import net.minecraft.client.render.block.entity.SkullBlockEntityRenderer;
-import net.minecraft.client.render.entity.model.LoadedEntityModels;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ProfileComponent;
+import net.minecraft.component.type.EquippableComponent;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ArmorItem;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.item.ModelTransformationMode;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.RotationAxis;
@@ -111,7 +104,6 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 {
     private static Matrix4f uiMatrix = new Matrix4f();
     private static final ThreadLocal<Float> UI_ANGLE_OVERRIDE = new ThreadLocal<>();
-    private static Map<SkullBlock.SkullType, SkullBlockEntityModel> skullModels;
 
     private MatrixCache bones = new MatrixCache();
 
@@ -474,7 +466,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (this.animator != null && model != null)
         {
-            MatrixStack stack = context.batcher.getContext().getMatrices();
+            MatrixStack stack = new MatrixStack();
 
             stack.push();
 
@@ -540,18 +532,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             this.applyPBRTextureIntensity();
             BBSModClient.getTextures().bindTexture(texture);
             this.clearPBRTextureIntensity();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+            BBSRendering.depthFunc(GL11.GL_LEQUAL);
 
-            Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
-            Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
-            RenderSystem.setupLevelDiffuseLighting(light0, light1);
+            BBSRendering.setupLevelLighting();
 
             Supplier<ShaderProgram> mainShader = (BBSRendering.isIrisShadersEnabled() && BBSRendering.isRenderingWorld()) || !model.isVAORendered()
-                ? () ->
-                {
-                    RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
-                    return RenderSystem.getShader();
-                }
+                ? BBSRendering::getEntityTranslucentProgram
                 : BBSShaders::getModel;
 
             this.renderModel(this.entity, mainShader, stack, model, LightmapTextureManager.pack(15, 15), OverlayTexture.DEFAULT_UV, color, true, null, context.getTransition(), true, null, null);
@@ -567,9 +553,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             stack.pop();
             stack.pop();
 
-            DiffuseLighting.disableGuiDepthLighting();
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
-            RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX_COLOR);
+            BBSRendering.depthFunc(GL11.GL_ALWAYS);
         }
         else
         {
@@ -591,16 +575,13 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (!model.culling)
         {
-            RenderSystem.disableCull();
+            BBSRendering.disableCull();
         }
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
+        BBSRendering.enableBlend();
+        BBSRendering.defaultBlendFunc();
+        BBSRendering.enableDepthTest();
         GameRenderer gameRenderer = MinecraftClient.getInstance().gameRenderer;
-
-        gameRenderer.getLightmapTextureManager().enable();
-        gameRenderer.getOverlayTexture().setupOverlayColor();
 
         MatrixStack newStack = new MatrixStack();
 
@@ -660,9 +641,9 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                  * bones (often torso) overwrite nearer ones (head) in the pick FBO.
                  * Body-part meshes draw after the host and win where they are in front —
                  * do not exclude host bones or anchors with parts become unpickable. */
-                RenderSystem.enableDepthTest();
-                RenderSystem.depthFunc(GL11.GL_LEQUAL);
-                RenderSystem.depthMask(true);
+                BBSRendering.enableDepthTest();
+                BBSRendering.depthFunc(GL11.GL_LEQUAL);
+                BBSRendering.depthMask(true);
 
                 ModelVAORenderer.clearPaint();
                 ModelVAORenderer.clearGlowing();
@@ -677,14 +658,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                 ModelVAORenderer.clearGlowing();
             }
 
-            gameRenderer.getLightmapTextureManager().disable();
-            gameRenderer.getOverlayTexture().teardownOverlayColor();
-            RenderSystem.disableBlend();
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.disableBlend();
+            BBSRendering.defaultBlendFunc();
 
             if (!model.culling)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
 
             this.captureMatrices(model);
@@ -1266,17 +1245,17 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                     if (forceDepth || suppressDepth)
                     {
                         savedDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-                        RenderSystem.enableDepthTest();
+                        BBSRendering.enableDepthTest();
 
                         if (forceDepth)
                         {
                             ShaderOpacityPatch.setForceLiveDepthWrite(true);
-                            RenderSystem.depthMask(true);
+                            BBSRendering.depthMask(true);
                         }
                         else
                         {
                             ShaderOpacityPatch.setSuppressLiveDepthWrite(true);
-                            RenderSystem.depthMask(false);
+                            BBSRendering.depthMask(false);
                         }
                     }
 
@@ -1295,12 +1274,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                         if (forceDepth)
                         {
                             ShaderOpacityPatch.setForceLiveDepthWrite(false);
-                            RenderSystem.depthMask(savedDepthMask);
+                            BBSRendering.depthMask(savedDepthMask);
                         }
                         else if (suppressDepth)
                         {
                             ShaderOpacityPatch.setSuppressLiveDepthWrite(false);
-                            RenderSystem.depthMask(savedDepthMask);
+                            BBSRendering.depthMask(savedDepthMask);
                         }
                     }
                 }
@@ -1823,14 +1802,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             ModelVAORenderer.clearGlowing();
         }
 
-        gameRenderer.getLightmapTextureManager().disable();
-        gameRenderer.getOverlayTexture().teardownOverlayColor();
-        RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
+        BBSRendering.disableBlend();
+        BBSRendering.defaultBlendFunc();
 
         if (!model.culling)
         {
-            RenderSystem.enableCull();
+            BBSRendering.enableCull();
         }
 
         /* Render items — restore vanilla entity lighting (diffuse + lightmap + overlay)
@@ -1846,12 +1823,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             if (!ui && (BBSRendering.isRenderingWorld() || previewEquipment))
             {
                 BBSRendering.prepareVanillaEntityLighting();
-                RenderSystem.enableDepthTest();
-                RenderSystem.depthFunc(GL11.GL_LEQUAL);
+                BBSRendering.enableDepthTest();
+                BBSRendering.depthFunc(GL11.GL_LEQUAL);
             }
 
-            this.renderItems(target, model, stack, EquipmentSlot.MAINHAND, ModelTransformationMode.THIRD_PERSON_RIGHT_HAND, model.itemsMain, model.itemsMainTransform, color, overlay, light);
-            this.renderItems(target, model, stack, EquipmentSlot.OFFHAND, ModelTransformationMode.THIRD_PERSON_LEFT_HAND, model.itemsOff, model.itemsOffTransform, color, overlay, light);
+            this.renderItems(target, model, stack, EquipmentSlot.MAINHAND, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, model.itemsMain, model.itemsMainTransform, color, overlay, light);
+            this.renderItems(target, model, stack, EquipmentSlot.OFFHAND, ItemDisplayContext.THIRD_PERSON_LEFT_HAND, model.itemsOff, model.itemsOffTransform, color, overlay, light);
 
             for (Map.Entry<ArmorType, ArmorSlot> entry : model.armorSlots.entrySet())
             {
@@ -1937,7 +1914,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
     private void renderDeferredGlowEmission(MatrixStack stack, ModelInstance model, int light, int overlay, StencilMap stencilMap, Color color, Link defaultTexture, TextureBlend textureBlend, GlowSettings glow, Color glowColor, Color legacyGlow)
     {
-        ModelVAORenderer.runWithPaintOverlayPass(false, () ->
+        ModelVAORenderer.runGlowEmissionPass(() ->
         {
             ModelVAORenderer.setPaint(0F, 0F, 0F, 0F);
             ModelVAORenderer.setGlow(glow, glowColor.r, glowColor.g, glowColor.b, legacyGlow);
@@ -1950,9 +1927,9 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             boolean savedDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
 
-            RenderSystem.enableBlend();
-            RenderSystem.depthMask(false);
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
+            BBSRendering.enableBlend();
+            BBSRendering.depthMask(false);
+            BBSRendering.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
 
             try
             {
@@ -1960,8 +1937,8 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             }
             finally
             {
-                RenderSystem.depthMask(savedDepthMask);
-                RenderSystem.defaultBlendFunc();
+                BBSRendering.depthMask(savedDepthMask);
+                BBSRendering.defaultBlendFunc();
             }
         });
     }
@@ -2011,7 +1988,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         boolean flipWinding = facingMatrix.determinant() < 0F;
 
-        RenderSystem.enableCull();
+        BBSRendering.enableCull();
         GL11.glFrontFace(flipWinding ? GL11.GL_CW : GL11.GL_CCW);
 
         try
@@ -2029,11 +2006,11 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             if (cullWasEnabled)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
         }
     }
@@ -2191,7 +2168,8 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             ModelVAORenderer.clearTextureBlend();
             model.render(stack, program, color, light, overlay, stencilMap, shapeKeys, this.getTextureResolver(model, toTexture));
         }
-        else if (model.supportsBbsModelShaderEffects() && (program.get() == BBSShaders.getModel() || ModelVAORenderer.isPaintOverlayPass()))
+        else if ((stencilMap != null || ModelVAORenderer.isPaintOverlayPass() || ModelVAORenderer.isColorGradeOverlayPass())
+            && model.supportsBbsModelShaderEffects() && (program.get() == BBSShaders.getModel() || ModelVAORenderer.isPaintOverlayPass()))
         {
             /* Single-pass shader blend: per-pixel alpha crossfade avoids two-pass holes when both skins are opaque.
              * Iris world pass uses vanilla two-pass below; BBS blend is allowed during paint overlay redraws. */
@@ -2201,8 +2179,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             try
             {
-                RenderSystem.setShader(blendProgram.get());
-                model.render(stack, blendProgram, color, light, overlay, stencilMap, shapeKeys, this.getTextureResolver(model, fromTexture));
+                                model.render(stack, blendProgram, color, light, overlay, stencilMap, shapeKeys, this.getTextureResolver(model, fromTexture));
             }
             finally
             {
@@ -2260,7 +2237,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (!model.supportsBbsModelShaderEffects())
         {
-            return () -> MinecraftClient.getInstance().getShaderLoader().getOrCreateProgram(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
+            return BBSRendering::getEntityTranslucentProgram;
         }
 
         if (this.hasAnyBoneTextureBlend(model))
@@ -2280,7 +2257,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (BBSRendering.isIrisWorldModelPass())
         {
-            return () -> MinecraftClient.getInstance().getShaderLoader().getOrCreateProgram(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
+            return BBSRendering::getEntityTranslucentProgram;
         }
 
         return BBSShaders::getModel;
@@ -2662,10 +2639,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (queue == SoftLimbQueue.IMMEDIATE)
         {
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
+            BBSRendering.enableDepthTest();
+            BBSRendering.depthFunc(GL11.GL_LEQUAL);
+            BBSRendering.enableBlend();
+            BBSRendering.defaultBlendFunc();
 
             try
             {
@@ -2673,8 +2650,8 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             }
             finally
             {
-                RenderSystem.depthMask(savedDepthMask);
-                RenderSystem.colorMask(true, true, true, true);
+                BBSRendering.depthMask(savedDepthMask);
+                BBSRendering.colorMask(true, true, true, true);
             }
 
             return;
@@ -2712,18 +2689,18 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             softStack.peek().getPositionMatrix().set(softPositionMatrix);
             softStack.peek().getNormalMatrix().set(draw.normalMatrix);
 
-            RenderSystem.depthMask(colorWritesDepth);
+            BBSRendering.depthMask(colorWritesDepth);
             this.drawSoftLimbBones(batch, draw, softStack, softProgram, softPositionMatrix);
 
             if (stampDepth)
             {
-                RenderSystem.colorMask(false, false, false, false);
-                RenderSystem.depthMask(true);
-                RenderSystem.disableBlend();
+                BBSRendering.colorMask(false, false, false, false);
+                BBSRendering.depthMask(true);
+                BBSRendering.disableBlend();
                 this.drawSoftLimbBones(batch, draw, softStack, softProgram, softPositionMatrix);
-                RenderSystem.enableBlend();
-                RenderSystem.defaultBlendFunc();
-                RenderSystem.colorMask(true, true, true, true);
+                BBSRendering.enableBlend();
+                BBSRendering.defaultBlendFunc();
+                BBSRendering.colorMask(true, true, true, true);
             }
         }
         finally
@@ -2736,7 +2713,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             ModelVAORenderer.clearGlowEffectTransform();
             ModelVAORenderer.clearPaint();
             ModelVAORenderer.clearGlowing();
-            RenderSystem.colorMask(true, true, true, true);
+            BBSRendering.colorMask(true, true, true, true);
         }
     }
 
@@ -2838,7 +2815,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         boolean flipWinding = facingMatrix.determinant() < 0F;
 
-        RenderSystem.enableCull();
+        BBSRendering.enableCull();
         GL11.glFrontFace(flipWinding ? GL11.GL_CW : GL11.GL_CCW);
         GL11.glCullFace(GL11.GL_BACK);
 
@@ -2853,11 +2830,11 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             if (cullWasEnabled)
             {
-                RenderSystem.enableCull();
+                BBSRendering.enableCull();
             }
             else
             {
-                RenderSystem.disableCull();
+                BBSRendering.disableCull();
             }
         }
     }
@@ -3291,14 +3268,14 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
     private void resetPostEquipmentRenderState()
     {
-        RenderSystem.depthMask(true);
-        RenderSystem.colorMask(true, true, true, true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableCull();
-        RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+        BBSRendering.depthMask(true);
+        BBSRendering.colorMask(true, true, true, true);
+        BBSRendering.enableDepthTest();
+        BBSRendering.depthFunc(GL11.GL_LEQUAL);
+        BBSRendering.disableBlend();
+        BBSRendering.defaultBlendFunc();
+        BBSRendering.enableCull();
+        BBSRendering.setShaderColor(1F, 1F, 1F, 1F);
     }
 
     private void renderArmor(IEntity target, MatrixStack stack, ArmorType type, ArmorSlot armorSlot, Color color, int overlay, int light)
@@ -3314,7 +3291,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             MatrixStackUtils.applyTransform(stack, armorSlot.transform);
             stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180F));
 
-            CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
+            CustomVertexConsumerProvider.hijackVertexFormat((l) -> BBSRendering.enableBlend());
 
             ActorEntityRenderer.armorRenderer.renderArmorSlot(stack, consumers, target, type.slot, type, light);
             consumers.draw();
@@ -3323,12 +3300,12 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             stack.pop();
 
-            RenderSystem.enableBlend();
-            RenderSystem.enableDepthTest();
+            BBSRendering.enableBlend();
+            BBSRendering.enableDepthTest();
         }
     }
 
-    private void renderItems(IEntity target, ModelInstance model, MatrixStack stack, EquipmentSlot slot, ModelTransformationMode mode, List<ArmorSlot> items, ArmorSlot globalTransform, Color color, int overlay, int light)
+    private void renderItems(IEntity target, ModelInstance model, MatrixStack stack, EquipmentSlot slot, ItemDisplayContext mode, List<ArmorSlot> items, ArmorSlot globalTransform, Color color, int overlay, int light)
     {
         ItemStack itemStack = target.getEquipmentStack(slot);
 
@@ -3373,30 +3350,18 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                     ? ItemUseRenderState.prepareProxy(target.getWorld(), target, slot, itemStack)
                     : null;
 
-                CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
+                CustomVertexConsumerProvider.hijackVertexFormat((l) -> BBSRendering.enableBlend());
 
                 consumers.setSubstitute(BBSRendering.getColorConsumer(color));
 
-                /* For some reason, due to Sodium and my color consumer, in some cases items like Trident,
-                 * shield, etc. not get rendered, but if in another arm there is another item, it does render...
-                 * So, I render a 0 size oak button to circumvent that bug! */
-                if (model.model instanceof BOBJModel)
-                {
-                    stack.push();
-                    stack.scale(0F, 0F, 0F);
-                    MinecraftClient.getInstance().getItemRenderer().renderItem(null, new ItemStack(Items.OAK_BUTTON), mode, mode == ModelTransformationMode.THIRD_PERSON_LEFT_HAND, stack, consumers, target.getWorld(), light, overlay, 0);
-                    consumers.draw();
-                    stack.pop();
-                }
-
-                MinecraftClient.getInstance().getItemRenderer().renderItem(itemEntity, itemStack, mode, mode == ModelTransformationMode.THIRD_PERSON_LEFT_HAND, stack, consumers, target.getWorld(), light, overlay, 0);
+                ItemRenderHelper.renderItem(itemStack, mode, stack, light, overlay, target.getWorld(), itemEntity, true);
                 consumers.draw();
                 consumers.setSubstitute(null);
                 CustomVertexConsumerProvider.clearRunnables();
 
                 stack.pop();
 
-                RenderSystem.enableDepthTest();
+                BBSRendering.enableDepthTest();
             }
         }
     }
@@ -3423,9 +3388,9 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             return;
         }
 
-        Item item = itemStack.getItem();
+        EquippableComponent equippable = itemStack.get(DataComponentTypes.EQUIPPABLE);
 
-        if (item instanceof ArmorItem)
+        if (equippable != null && equippable.slot() == EquipmentSlot.HEAD && equippable.assetId().isPresent())
         {
             return;
         }
@@ -3455,35 +3420,28 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         /* Skulls bypass ItemRenderer (Iris MixinItemRenderer); bake the same block/item IDs. */
         try (IrisArmorHooks.Scope ignored = IrisArmorHooks.beginEquippedItem(target, itemStack))
         {
+            Item item = itemStack.getItem();
+
             if (item instanceof BlockItem blockItem && blockItem.getBlock() instanceof AbstractSkullBlock skullBlock)
             {
-                float tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(true);
+                float tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(true);
                 float animationProgress = this.resolveSkullAnimationProgress(target, tickDelta);
 
                 BbsHeadItemSpace.applySkull(stack);
-                this.renderSkullOnHead(itemStack, skullBlock, stack, consumers, color, light, animationProgress);
+                ItemRenderHelper.renderSkull(itemStack, skullBlock.getSkullType(), animationProgress, stack, light, overlay, color);
             }
             else
             {
-                ModelTransformationMode mode = BbsHeadItemSpace.headItemTransformationMode();
+                ItemDisplayContext mode = BbsHeadItemSpace.headItemTransformationMode();
                 boolean leftHanded = BbsHeadItemSpace.headItemLeftHanded();
                 LivingEntity itemEntity = ItemUseRenderState.prepareProxy(target.getWorld(), target, EquipmentSlot.HEAD, itemStack);
 
                 BbsHeadItemSpace.applyHeadItem(stack);
 
-                CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
+                CustomVertexConsumerProvider.hijackVertexFormat((l) -> BBSRendering.enableBlend());
                 consumers.setSubstitute(BBSRendering.getColorConsumer(color));
 
-                if (model.model instanceof BOBJModel)
-                {
-                    stack.push();
-                    stack.scale(0F, 0F, 0F);
-                    MinecraftClient.getInstance().getItemRenderer().renderItem(null, new ItemStack(Items.OAK_BUTTON), mode, leftHanded, stack, consumers, target.getWorld(), light, overlay, 0);
-                    consumers.draw();
-                    stack.pop();
-                }
-
-                MinecraftClient.getInstance().getItemRenderer().renderItem(itemEntity, itemStack, mode, leftHanded, stack, consumers, target.getWorld(), light, overlay, 0);
+                ItemRenderHelper.renderItem(itemStack, mode, stack, light, overlay, target.getWorld(), itemEntity, true);
                 consumers.draw();
                 consumers.setSubstitute(null);
                 CustomVertexConsumerProvider.clearRunnables();
@@ -3491,7 +3449,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         }
 
         stack.pop();
-        RenderSystem.enableDepthTest();
+        BBSRendering.enableDepthTest();
     }
 
     /**
@@ -3504,60 +3462,18 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         {
             if (living.getVehicle() instanceof LivingEntity vehicle)
             {
-                return vehicle.limbAnimator.getPos(tickDelta);
+                return vehicle.limbAnimator.getAnimationProgress(tickDelta);
             }
 
-            return living.limbAnimator.getPos(tickDelta);
+            return living.limbAnimator.getAnimationProgress(tickDelta);
         }
 
         return target.getLimbPos(tickDelta);
     }
 
-    private void renderSkullOnHead(ItemStack itemStack, AbstractSkullBlock skullBlock, MatrixStack stack, CustomVertexConsumerProvider consumers, Color color, int light, float animationProgress)
-    {
-        SkullBlock.SkullType skullType = skullBlock.getSkullType();
-        SkullBlockEntityModel skullModel = this.getSkullModels().get(skullType);
-
-        if (skullModel == null)
-        {
-            return;
-        }
-
-        ProfileComponent profile = itemStack.get(DataComponentTypes.PROFILE);
-        RenderLayer renderLayer = SkullBlockEntityRenderer.getRenderLayer(skullType, profile);
-
-        CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
-        consumers.setSubstitute(BBSRendering.getColorConsumer(color));
-        SkullBlockEntityRenderer.renderSkull(null, 180.0F, animationProgress, stack, consumers, light, skullModel, renderLayer);
-        consumers.draw();
-        consumers.setSubstitute(null);
-        CustomVertexConsumerProvider.clearRunnables();
-    }
-
-    private Map<SkullBlock.SkullType, SkullBlockEntityModel> getSkullModels()
-    {
-        if (skullModels == null)
-        {
-            skullModels = new HashMap<>();
-            LoadedEntityModels loaded = MinecraftClient.getInstance().getLoadedEntityModels();
-
-            for (SkullBlock.Type type : SkullBlock.Type.values())
-            {
-                SkullBlockEntityModel model = SkullBlockEntityRenderer.getModels(loaded, type);
-
-                if (model != null)
-                {
-                    skullModels.put(type, model);
-                }
-            }
-        }
-
-        return skullModels;
-    }
-
     /**
      * Active spyglass on player ModelForms via {@link BbsHeadItemSpace} (BBS adaptation of
-     * vanilla head + {@link ModelTransformationMode#HEAD}). Arm pose stays on
+     * vanilla head + {@link ItemDisplayContext#HEAD}). Arm pose stays on
      * {@code ProceduralItemUsePoses.applySpyglass}.
      */
     private boolean renderSpyglassOnHead(IEntity target, ModelInstance model, MatrixStack stack, EquipmentSlot slot, ItemStack itemStack, Color color, int overlay, int light)
@@ -3569,10 +3485,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             return false;
         }
 
-        float transition = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(true);
+        float transition = MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(true);
         float pitch = (float) Lerps.lerp(target.getPrevPitch(), target.getPitch(), transition);
         boolean leftArm = this.getArmForEquipmentSlot(target, slot) == Arm.LEFT;
-        ModelTransformationMode mode = BbsHeadItemSpace.spyglassTransformationMode();
+        ItemDisplayContext mode = BbsHeadItemSpace.spyglassTransformationMode();
         boolean leftHanded = BbsHeadItemSpace.spyglassLeftHanded();
 
         CustomVertexConsumerProvider consumers = FormUtilsClient.getProvider();
@@ -3582,25 +3498,16 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         MatrixStackUtils.multiply(stack, matrix);
         BbsHeadItemSpace.applySpyglass(stack, pitch, leftArm);
 
-        CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
+        CustomVertexConsumerProvider.hijackVertexFormat((l) -> BBSRendering.enableBlend());
         consumers.setSubstitute(BBSRendering.getColorConsumer(color));
 
-        if (model.model instanceof BOBJModel)
-        {
-            stack.push();
-            stack.scale(0F, 0F, 0F);
-            MinecraftClient.getInstance().getItemRenderer().renderItem(null, new ItemStack(Items.OAK_BUTTON), mode, leftHanded, stack, consumers, target.getWorld(), light, overlay, 0);
-            consumers.draw();
-            stack.pop();
-        }
-
-        MinecraftClient.getInstance().getItemRenderer().renderItem(itemEntity, itemStack, mode, leftHanded, stack, consumers, target.getWorld(), light, overlay, 0);
+        ItemRenderHelper.renderItem(itemStack, mode, stack, light, overlay, target.getWorld(), itemEntity, true);
         consumers.draw();
         consumers.setSubstitute(null);
         CustomVertexConsumerProvider.clearRunnables();
 
         stack.pop();
-        RenderSystem.enableDepthTest();
+        BBSRendering.enableDepthTest();
 
         return true;
     }
@@ -3625,7 +3532,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
     @Override
     public boolean renderArm(MatrixStack matrices, int light, AbstractClientPlayerEntity player, Hand hand)
     {
-        this.ensureAnimator(MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(true));
+        this.ensureAnimator(MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(true));
         ModelInstance model = this.getModel();
 
         if (this.animator != null && model != null)
@@ -3688,15 +3595,11 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             this.clearPBRTextureIntensity();
 
             Supplier<ShaderProgram> mainShader = (BBSRendering.isIrisShadersEnabled() && BBSRendering.isRenderingWorld()) || !model.isVAORendered()
-                ? () ->
-                {
-                    RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
-                    return RenderSystem.getShader();
-                }
+                ? BBSRendering::getEntityTranslucentProgram
                 : BBSShaders::getModel;
 
-            RenderSystem.enableDepthTest();
-            RenderSystem.enableBlend();
+            BBSRendering.enableDepthTest();
+            BBSRendering.enableBlend();
 
             this.renderModel(this.entity, mainShader, matrices, model, light, OverlayTexture.DEFAULT_UV, color, false, null, 0F, true, null, null);
 
@@ -3766,11 +3669,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             }
 
             Supplier<ShaderProgram> mainShader = (BBSRendering.isIrisShadersEnabled() && BBSRendering.isRenderingWorld()) || !model.isVAORendered()
-                ? () ->
-                {
-                    RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_ENTITY_TRANSLUCENT);
-                    return RenderSystem.getShader();
-                }
+                ? BBSRendering::getEntityTranslucentProgram
                 : BBSShaders::getModel;
             Supplier<ShaderProgram> shader = this.getShader(context, mainShader, BBSShaders::getPickerModelsProgram);
 
@@ -3850,8 +3749,6 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             float scaleSnapshot = rainbowScale;
 
             ModelVAORenderer.submitOutlineOverlay(
-                new Matrix4f(RenderSystem.getProjectionMatrix()),
-                new Matrix4f(RenderSystem.getModelViewMatrix()),
                 () -> FormOutlineRenderer.render(deferredStack, model, shapeKeys, textureResolver, light, colorSnapshot, thicknessSnapshot, rainbowSnapshot, speedSnapshot, scaleSnapshot, bodyParts)
             );
         }

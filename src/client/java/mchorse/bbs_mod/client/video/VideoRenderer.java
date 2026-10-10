@@ -185,7 +185,7 @@ public class VideoRenderer
         WaterMediaVideoRenderer.renderOverlay(stack, batcher, overlay, isRunning, viewport, screenWidth, screenHeight);
     }
 
-    public static void render(MatrixStack stack, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
+    public static void render(MatrixStack stack, Batcher2D batcher, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
     {
         if (!isModPresent())
         {

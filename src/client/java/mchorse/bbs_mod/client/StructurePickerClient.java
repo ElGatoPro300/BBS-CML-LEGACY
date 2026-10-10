@@ -2137,7 +2137,7 @@ public class StructurePickerClient
             return;
         }
 
-        RegistryKey<World> key = mc.player.getWorld().getRegistryKey();
+        RegistryKey<World> key = mc.player.getEntityWorld().getRegistryKey();
 
         mc.getServer().execute(() ->
         {

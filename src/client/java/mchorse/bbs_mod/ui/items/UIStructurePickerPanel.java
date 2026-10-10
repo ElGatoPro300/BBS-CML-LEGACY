@@ -217,9 +217,7 @@ public class UIStructurePickerPanel extends UIOverlayPanel
             @Override
             public void render(UIContext context)
             {
-                int y = this.area.my();
-
-                context.batcher.box(this.area.x, y, this.area.ex(), y + 1, 0x66FFFFFF);
+                context.batcher.box(this.area.x, this.area.y, this.area.ex(), this.area.y + 1, 0x66FFFFFF);
                 super.render(context);
             }
         };

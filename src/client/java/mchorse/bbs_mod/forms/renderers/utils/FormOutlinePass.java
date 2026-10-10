@@ -12,8 +12,6 @@ import net.minecraft.client.util.math.MatrixStack;
 
 import org.joml.Matrix4f;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-
 import java.util.function.Consumer;
 
 /**
@@ -114,8 +112,6 @@ public final class FormOutlinePass
             float scaleSnapshot = rainbowScale;
 
             ModelVAORenderer.submitOutlineOverlay(
-                new Matrix4f(RenderSystem.getProjectionMatrix()),
-                new Matrix4f(RenderSystem.getModelViewMatrix()),
                 () -> FormOutlineRenderer.render(deferredStack, colorSnapshot, thicknessSnapshot, rainbowSnapshot, speedSnapshot, scaleSnapshot,
                     () -> maskDraw.accept(deferredStack))
             );

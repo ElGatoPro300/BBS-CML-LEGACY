@@ -3,8 +3,10 @@ package mchorse.bbs_mod.forms.renderers;
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
+import mchorse.bbs_mod.client.BBSUniform;
 import mchorse.bbs_mod.client.ItemUseRenderState;
 import mchorse.bbs_mod.client.MobTextureOverride;
+import mchorse.bbs_mod.client.render.EntityPreviewRenderHelper;
 import mchorse.bbs_mod.client.renderer.MorphMobParticles;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.film.MobItemStats;
@@ -30,17 +32,17 @@ import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.Transform;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.network.OtherClientPlayerEntity;
-import net.minecraft.client.render.DiffuseLighting;
-import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.command.RenderDispatcher;
+import net.minecraft.client.render.entity.EntityRenderManager;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.render.entity.state.EntityRenderState;
 import net.minecraft.client.render.entity.state.LivingEntityRenderState;
+import net.minecraft.client.render.state.CameraRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
@@ -53,18 +55,19 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.util.ErrorReporter;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import com.mojang.authlib.GameProfile;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.brigadier.StringReader;
 
 import org.lwjgl.opengl.GL11;
 
@@ -356,7 +359,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
         try
         {
-            compound = (new StringNbtReader(new StringReader(nbt))).parseCompound();
+            compound = StringNbtReader.readCompound(nbt);
         }
         catch (Exception e)
         {}
@@ -372,7 +375,9 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
         if (this.entity != null)
         {
             compound.putString("id", id);
-            this.entity.readNbt(compound);
+            RegistryWrapper.WrapperLookup lookup = this.entity.getEntityWorld() != null ? this.entity.getEntityWorld().getRegistryManager() : MinecraftClient.getInstance().world.getRegistryManager();
+            ReadView readView = NbtReadView.create(ErrorReporter.EMPTY, lookup, compound);
+            this.entity.readData(readView);
             this.entity.noClip = true;
         }
     }
@@ -562,9 +567,9 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
         if (this.entity != null)
         {
-            MatrixStack stack = context.batcher.getContext().getMatrices();
+            context.batcher.flush();
 
-            stack.push();
+            MatrixStack stack = new MatrixStack();
 
             Matrix4f uiMatrix = ModelFormRenderer.getUIMatrix(context, x1, y1, x2, y2);
             CustomVertexConsumerProvider consumers = FormUtilsClient.getProvider();
@@ -597,9 +602,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
                 }
             });
 
-            Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
-            Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
-            RenderSystem.setupLevelDiffuseLighting(light0, light1);
+            BBSRendering.setupLevelLighting();
 
             Color tint = this.resolveMobTint(Colors.WHITE);
             Function<VertexConsumer, VertexConsumer> recolor = this.createMobRecolor(tint);
@@ -612,7 +615,19 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
             {
                 if (tint.a > 0.001F)
                 {
-                    MinecraftClient.getInstance().getEntityRenderDispatcher().render(this.entity, 0D, 0D, 0D, 0F, stack, consumers, LightmapTextureManager.MAX_BLOCK_LIGHT_COORDINATE);
+                    EntityRenderManager entityRenderManager = MinecraftClient.getInstance().getEntityRenderDispatcher();
+                    EntityRenderState renderState = entityRenderManager.getAndUpdateRenderState(this.entity, 0F);
+                    renderState.shadowRadius = 0F;
+                    if (renderState.shadowPieces != null)
+                    {
+                        renderState.shadowPieces.clear();
+                    }
+
+                    RenderDispatcher dispatcher = EntityPreviewRenderHelper.getDispatcher();
+                    CameraRenderState cameraRenderState = new CameraRenderState();
+                    entityRenderManager.render(renderState, cameraRenderState, 0.0D, 0.0D, 0.0D, stack, EntityPreviewRenderHelper.getQueue());
+                    dispatcher.render();
+                    EntityPreviewRenderHelper.flushEntityBuffers();
                 }
             }
             finally
@@ -626,11 +641,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
             CustomVertexConsumerProvider.clearRunnables();
 
-            DiffuseLighting.disableGuiDepthLighting();
-
-            stack.pop();
-
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+            BBSRendering.depthFunc(GL11.GL_ALWAYS);
         }
     }
 
@@ -664,7 +675,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
                     this.setupTarget(context, picker);
                     this.setIgnoreLightmap(picker, 1);
-                    RenderSystem.setShader(BBSShaders.getPickerModelsProgram());
+                    BBSRendering.bindProgram(picker);
                 });
 
                 light = 0;
@@ -756,7 +767,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
             MobTextureOverride.begin(this.form.texture.get());
             this.applyPBRTextureIntensity();
 
-            EntityRenderDispatcher dispatcher = MinecraftClient.getInstance().getEntityRenderDispatcher();
+            EntityRenderManager entityRenderManager = MinecraftClient.getInstance().getEntityRenderDispatcher();
             Color tint = this.resolveMobTint(context.color);
             boolean shadowPass = context.isShadowPass || BBSRendering.isIrisShadowPass();
             boolean localPreview = context.isLocalPreview();
@@ -782,9 +793,6 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
                     BBSRendering.prepareVanillaEntityLighting();
                 }
 
-                /* Film draws its own ground shadow; nested vanilla shadow on the morph can
-                 * defer the last clothing layer until a late draw with a bad light basis. */
-                dispatcher.setRenderShadows(false);
                 if (!skippedLiveDraw && softPostDeferred)
                 {
                     boolean irisWorld = BBSRendering.isIrisWorldModelPass();
@@ -810,24 +818,31 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
                         CustomVertexConsumerProvider deferredConsumers = FormUtilsClient.getMobMorphProvider();
                         Function<VertexConsumer, VertexConsumer> recolor = this.createMobRecolor(tintSnapshot);
 
-                        RenderSystem.enableDepthTest();
-                        RenderSystem.depthMask(depthWrite);
+                        BBSRendering.enableDepthTest();
+                        BBSRendering.depthMask(depthWrite);
                         ShaderOpacityPatch.reassertPostDeferredDepthState(depthWrite);
                         deferredConsumers.setSubstitute(recolor);
                         MobTextureOverride.begin(textureSnapshot);
                         this.applyPBRTextureIntensity();
 
-                        EntityRenderDispatcher deferredDispatcher = MinecraftClient.getInstance().getEntityRenderDispatcher();
+                        EntityRenderManager deferredManager = MinecraftClient.getInstance().getEntityRenderDispatcher();
 
                         try
                         {
-                            deferredDispatcher.setRenderShadows(false);
-                            deferredDispatcher.render(this.entity, 0D, 0D, 0D, 0F, deferredStack, deferredConsumers, lightSnapshot);
-                            deferredConsumers.draw();
+                            EntityRenderState renderState = deferredManager.getAndUpdateRenderState(this.entity, transitionSnapshot);
+                            renderState.shadowRadius = 0F;
+                            if (renderState.shadowPieces != null)
+                            {
+                                renderState.shadowPieces.clear();
+                            }
+
+                            RenderDispatcher deferredDispatcher = MinecraftClient.getInstance().gameRenderer.getEntityRenderDispatcher();
+                            CameraRenderState cameraRenderState = new CameraRenderState();
+                            deferredManager.render(renderState, cameraRenderState, 0.0D, 0.0D, 0.0D, deferredStack, deferredDispatcher.getQueue());
+                            deferredDispatcher.render();
                         }
                         finally
                         {
-                            deferredDispatcher.setRenderShadows(true);
                             this.clearPBRTextureIntensity();
                             MobTextureOverride.end();
                             deferredConsumers.setSubstitute(null);
@@ -848,13 +863,22 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
                 else if (!skippedLiveDraw)
                 {
                     consumers.setSubstitute(this.createMobRecolor(tint));
-                    dispatcher.render(this.entity, 0D, 0D, 0D, 0F, context.stack, consumers, light);
+                    EntityRenderState renderState = entityRenderManager.getAndUpdateRenderState(this.entity, context.getTransition());
+                    renderState.shadowRadius = 0F;
+                    if (renderState.shadowPieces != null)
+                    {
+                        renderState.shadowPieces.clear();
+                    }
+
+                    RenderDispatcher dispatcher = MinecraftClient.getInstance().gameRenderer.getEntityRenderDispatcher();
+                    CameraRenderState cameraRenderState = new CameraRenderState();
+                    entityRenderManager.render(renderState, cameraRenderState, 0.0D, 0.0D, 0.0D, context.stack, dispatcher.getQueue());
+                    dispatcher.render();
                     consumers.setSubstitute(null);
                 }
             }
             finally
             {
-                dispatcher.setRenderShadows(true);
                 this.clearPBRTextureIntensity();
                 MobTextureOverride.end();
             }
@@ -903,12 +927,11 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
                 if (prepareLighting)
                 {
-                    MinecraftClient.getInstance().gameRenderer.getOverlayTexture().teardownOverlayColor();
                     BBSRendering.restoreWorldRenderState();
                 }
 
                 MatrixStackUtils.popUntil(context.stack, stackMarker);
-                RenderSystem.enableDepthTest();
+                BBSRendering.enableDepthTest();
             }
         }
     }
@@ -954,28 +977,32 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
     private void drawOutlineMask(MatrixStack stack, int light, float transition, Link texture)
     {
-        CustomVertexConsumerProvider consumers = FormUtilsClient.getMobMorphProvider();
-        EntityRenderDispatcher dispatcher = MinecraftClient.getInstance().getEntityRenderDispatcher();
-
         CustomVertexConsumerProvider.hijackVertexFormat((layer) ->
         {
             this.bindTexture();
-            RenderSystem.setShader(BBSShaders.getOutlineMask());
+            BBSRendering.bindProgram(BBSShaders.getOutlineMask());
         });
 
         MobTextureOverride.begin(texture);
         this.applyPBRTextureIntensity();
-        consumers.setSubstitute(null);
-        dispatcher.setRenderShadows(false);
 
         try
         {
-            dispatcher.render(this.entity, 0D, 0D, 0D, 0F, stack, consumers, light);
-            consumers.draw();
+            EntityRenderManager entityRenderManager = MinecraftClient.getInstance().getEntityRenderDispatcher();
+            EntityRenderState renderState = entityRenderManager.getAndUpdateRenderState(this.entity, transition);
+            renderState.shadowRadius = 0F;
+            if (renderState.shadowPieces != null)
+            {
+                renderState.shadowPieces.clear();
+            }
+
+            RenderDispatcher dispatcher = MinecraftClient.getInstance().gameRenderer.getEntityRenderDispatcher();
+            CameraRenderState cameraRenderState = new CameraRenderState();
+            entityRenderManager.render(renderState, cameraRenderState, 0.0D, 0.0D, 0.0D, stack, dispatcher.getQueue());
+            dispatcher.render();
         }
         finally
         {
-            dispatcher.setRenderShadows(true);
             this.clearPBRTextureIntensity();
             MobTextureOverride.end();
             CustomVertexConsumerProvider.clearRunnables();
@@ -1036,9 +1063,12 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
                     this.prevHandSwing = handSwingProgress;
                 }
 
-                this.entity.prevX = entity.getPrevX();
-                this.entity.prevY = entity.getPrevY();
-                this.entity.prevZ = entity.getPrevZ();
+                this.entity.lastX = entity.getPrevX();
+                this.entity.lastY = entity.getPrevY();
+                this.entity.lastZ = entity.getPrevZ();
+                this.entity.lastRenderX = entity.getPrevX();
+                this.entity.lastRenderY = entity.getPrevY();
+                this.entity.lastRenderZ = entity.getPrevZ();
                 this.entity.setPos(entity.getX(), entity.getY(), entity.getZ());
                 this.entity.setOnGround(entity.isOnGround());
                 this.entity.setSneaking(entity.isSneaking());
@@ -1125,10 +1155,10 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
         livingMorph.setBodyYaw(0F);
         livingMorph.setHeadYaw(relativeHeadYaw);
         livingMorph.setPitch(source.getPitch());
-        livingMorph.prevYaw = 0F;
-        livingMorph.prevBodyYaw = 0F;
-        livingMorph.prevHeadYaw = relativePrevHeadYaw;
-        livingMorph.prevPitch = source.getPrevPitch();
+        livingMorph.lastYaw = 0F;
+        livingMorph.lastBodyYaw = 0F;
+        livingMorph.lastHeadYaw = relativePrevHeadYaw;
+        livingMorph.lastPitch = source.getPrevPitch();
     }
 
     /**
@@ -1165,10 +1195,12 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
 
         try
         {
-            NbtCompound compound = (new StringNbtReader(new StringReader(nbt))).parseCompound();
+            NbtCompound compound = StringNbtReader.readCompound(nbt);
 
             compound.putString("id", this.form.mobID.get());
-            this.entity.readNbt(compound);
+            RegistryWrapper.WrapperLookup lookup = this.entity.getEntityWorld() != null ? this.entity.getEntityWorld().getRegistryManager() : MinecraftClient.getInstance().world.getRegistryManager();
+            ReadView readView = NbtReadView.create(ErrorReporter.EMPTY, lookup, compound);
+            this.entity.readData(readView);
             this.appliedMobNbt = nbt;
             this.entity.noClip = true;
         }
@@ -1199,12 +1231,7 @@ public class MobFormRenderer extends FormRenderer<MobForm> implements ITickable
             return;
         }
 
-        GlUniform ignore = program.getUniform("IgnoreLightmap");
-
-        if (ignore != null)
-        {
-            ignore.set(value);
-        }
+        BBSUniform.set(program, "IgnoreLightmap", value);
     }
 
     public static int getStencilPickOffset(ModelPart part, int light)

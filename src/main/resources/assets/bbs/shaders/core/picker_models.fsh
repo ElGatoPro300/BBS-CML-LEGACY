@@ -1,9 +1,8 @@
-#version 150
+#version 330
+
+#moj_import <bbs:model_effects.glsl>
 
 uniform sampler2D Sampler0;
-
-uniform int Target;
-uniform int IgnoreLightmap;
 
 in vec4 vertexColor;
 in vec2 texCoord0;

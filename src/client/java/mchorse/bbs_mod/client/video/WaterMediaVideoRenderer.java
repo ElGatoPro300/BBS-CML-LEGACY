@@ -3,19 +3,19 @@ package mchorse.bbs_mod.client.video;
 import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.misc.VideoOverlay;
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.utils.clips.Clip;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 
 import org.joml.Matrix4f;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
 
@@ -154,7 +154,7 @@ public class WaterMediaVideoRenderer
 
         if (!overlay.global)
         {
-            RenderSystem.disableScissor();
+            BBSRendering.disableScissor();
         }
     }
 
@@ -180,7 +180,7 @@ public class WaterMediaVideoRenderer
         int glW = Math.max(0, Math.round(w * sx));
         int glH = Math.max(0, Math.round(h * sy));
 
-        RenderSystem.enableScissor(glX, glY, glW, glH);
+        BBSRendering.enableScissor(glX, glY, glW, glH);
     }
 
     private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
@@ -377,14 +377,14 @@ public class WaterMediaVideoRenderer
             return;
         }
 
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
-        RenderSystem.setShaderTexture(0, frame.textureId);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, opacity);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.disableCull();
+        BBSRendering.bindProgram(BBSRendering.getPositionTexProgram());
+        BBSRendering.setShaderTexture(0, frame.textureId);
+        BBSRendering.setShaderColor(1.0F, 1.0F, 1.0F, opacity);
+        BBSRendering.enableBlend();
+        BBSRendering.defaultBlendFunc();
+        BBSRendering.disableDepthTest();
+        BBSRendering.depthMask(false);
+        BBSRendering.disableCull();
 
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
@@ -400,10 +400,10 @@ public class WaterMediaVideoRenderer
         buffer.vertex(matrix, drawX, drawY, 0).texture(u0, v0);
         BufferRenderer.drawWithGlobalProgram(buffer.end());
 
-        RenderSystem.enableCull();
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        BBSRendering.enableCull();
+        BBSRendering.depthMask(true);
+        BBSRendering.enableDepthTest();
+        BBSRendering.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     /**

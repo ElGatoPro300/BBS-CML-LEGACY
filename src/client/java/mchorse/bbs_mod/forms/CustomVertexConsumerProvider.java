@@ -1,6 +1,5 @@
 package mchorse.bbs_mod.forms;
 
-import mchorse.bbs_mod.forms.renderers.FramebufferFormRenderer;
 import mchorse.bbs_mod.forms.renderers.utils.BlockPaintOverlayVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.GlowEmissionVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.RecolorVertexConsumer;
@@ -10,7 +9,7 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 import org.lwjgl.opengl.GL11;
 
@@ -27,10 +26,8 @@ public class CustomVertexConsumerProvider implements VertexConsumerProvider
 
     public static void drawLayer(RenderLayer layer)
     {
-        /* Rebind before/after layer setup: RenderLayer startDrawing can steal the main FB
-         * (and under Iris, the world projection). Keep pick + framebuffer-form targets. */
+        /* Rebind before/after layer setup: RenderLayer startDrawing can steal the main FB. */
         StencilFormFramebuffer.rebindActive();
-        FramebufferFormRenderer.rebindActive();
 
         if (runnables != null)
         {
@@ -38,7 +35,6 @@ public class CustomVertexConsumerProvider implements VertexConsumerProvider
         }
 
         StencilFormFramebuffer.rebindActive();
-        FramebufferFormRenderer.rebindActive();
     }
 
     public static void hijackVertexFormat(Consumer<RenderLayer> runnable)
@@ -106,7 +102,7 @@ public class CustomVertexConsumerProvider implements VertexConsumerProvider
             /* Force back the depth func because it seems like stuff rendered by a vertex
              * consumer is resetting the depth func to GL_LESS, and since this vertex consumer
              * is designed  */
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+            GlStateManager._depthFunc(GL11.GL_ALWAYS);
         }
     }
 

@@ -7,21 +7,19 @@ import mchorse.bbs_mod.items.StructurePickerRegionMerger;
 import mchorse.bbs_mod.items.StructurePickerSelection;
 import mchorse.bbs_mod.ui.items.UIStructurePickerPanel;
 
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
 
@@ -59,24 +57,23 @@ public class StructurePickerRenderer
             return;
         }
 
-        if (context.matrixStack() == null)
+        if (context.matrices() == null)
         {
             return;
         }
 
         MinecraftClient mc = MinecraftClient.getInstance();
-        Vec3d camera = mc.gameRenderer.getCamera().getPos();
+        Vec3d camera = mc.gameRenderer.getCamera().getCameraPos();
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(770, 771, 1, 0);
         /* Depth on: selection must not paint through buried blocks / walls. */
-        RenderSystem.disableCull();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        GlStateManager._disableCull();
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthMask(false);
+        GlStateManager._depthFunc(GL11.GL_LEQUAL);
 
-        MatrixStack stack = context.matrixStack();
+        MatrixStack stack = context.matrices();
 
         stack.push();
         stack.translate(-camera.x, -camera.y, -camera.z);
@@ -120,9 +117,8 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderBrushPreview(stack);
 
         /* Corner handles + scale axes always on top so they stay readable. */
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_ALWAYS);
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        GlStateManager._disableDepthTest();
+        GlStateManager._depthFunc(GL11.GL_ALWAYS);
         StructurePickerRenderer.renderCornerGizmos(stack, camera);
 
         if (StructurePickerScaleGizmo.isActive())
@@ -132,11 +128,11 @@ public class StructurePickerRenderer
 
         stack.pop();
 
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
+        GlStateManager._depthFunc(GL11.GL_LEQUAL);
+        GlStateManager._depthMask(true);
+        GlStateManager._enableDepthTest();
+        GlStateManager._enableCull();
+        GlStateManager._disableBlend();
     }
 
     private static float[] resolveRegionColor(int regionIndex)
@@ -284,7 +280,7 @@ public class StructurePickerRenderer
         Draw.fillBox(builder, stack, 0F, 0F, 0F, (float) w, (float) h, (float) d, r, g, b, a);
         stack.pop();
 
-        BufferRenderer.drawWithGlobalProgram(builder.end());
+        Draw.flush(builder, Draw.getPositionColorLayer());
     }
 
     private static void renderBoxEdges(MatrixStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b, float a)
@@ -306,7 +302,7 @@ public class StructurePickerRenderer
         Draw.fillBox(builder, stack, -t, -t + fh, -t, t + fw, t + fh, t, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t + fh, -t + fd, t + fw, t + fh, t + fd, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t + fh, -t, t, t + fh, t + fd, r, g, b, a);
-        Draw.fillBox(builder, stack, -t + fw, -t + fh, -t, t + fw, t + fh, t + fd, r, g, b, a);
+        Draw.fillBox(builder, stack, -t + fw, -t + fh, -t, t + fw, t + fh, t, r, g, b, a);
 
         Draw.fillBox(builder, stack, -t, -t, -t, t + fw, t, t, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t, -t + fd, t + fw, t, t + fd, r, g, b, a);
@@ -314,7 +310,7 @@ public class StructurePickerRenderer
         Draw.fillBox(builder, stack, -t + fw, -t, -t, t + fw, t, t + fd, r, g, b, a);
 
         stack.pop();
-        BufferRenderer.drawWithGlobalProgram(builder.end());
+        Draw.flush(builder, Draw.getPositionColorLayer());
     }
 
     private static void renderSelectionCorners(MatrixStack stack, BlockPos first, BlockPos second, StructurePickerMode mode, Vec3d camera)

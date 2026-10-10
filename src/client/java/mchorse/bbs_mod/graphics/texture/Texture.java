@@ -2,10 +2,10 @@ package mchorse.bbs_mod.graphics.texture;
 
 import mchorse.bbs_mod.utils.resources.Pixels;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.platform.TextureUtil;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 
@@ -38,11 +38,28 @@ public class Texture
             return null;
         }
 
+        int prevPbo = GL11.glGetInteger(GL30.GL_PIXEL_PACK_BUFFER_BINDING);
+        int prevPackAlignment = GL11.glGetInteger(GL11.GL_PACK_ALIGNMENT);
+        int prevPackRowLength = GL11.glGetInteger(GL11.GL_PACK_ROW_LENGTH);
+
         ByteBuffer buffer = MemoryUtil.memAlloc(texture.width * texture.height * 4);
 
-        texture.bind();
-        GL11.glGetTexImage(texture.target, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
-        texture.unbind();
+        try
+        {
+            GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, 0);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 4);
+            GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, 0);
+
+            texture.bind();
+            GL11.glGetTexImage(texture.target, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+            texture.unbind();
+        }
+        finally
+        {
+            GL30.glBindBuffer(GL30.GL_PIXEL_PACK_BUFFER, prevPbo);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, prevPackAlignment);
+            GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, prevPackRowLength);
+        }
 
         return new Pixels(buffer, texture.width, texture.height);
     }
@@ -60,7 +77,7 @@ public class Texture
 
     public Texture()
     {
-        this.id = TextureUtil.generateTextureId();
+        this.id = GlStateManager._genTexture();
         this.target = GL11.GL_TEXTURE_2D;
 
         this.bind();
@@ -116,14 +133,14 @@ public class Texture
         GlStateManager._bindTexture(this.id);
     }
 
-    public void bind(int texture)
+    public void bind(int unit)
     {
         if (this.id <= 0)
         {
             return;
         }
 
-        GlStateManager._activeTexture(texture);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
         GlStateManager._bindTexture(this.id);
     }
 
@@ -132,9 +149,9 @@ public class Texture
         GlStateManager._bindTexture(0);
     }
 
-    public void unbind(int texture)
+    public void unbind(int unit)
     {
-        GlStateManager._activeTexture(texture);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
         GlStateManager._bindTexture(0);
     }
 
@@ -193,16 +210,16 @@ public class Texture
 
     public void delete()
     {
-        GL11.glDeleteTextures(this.id);
+        GlStateManager._deleteTexture(this.id);
         this.id = -1;
     }
 
     public void setSize(int width, int height)
     {
-        this.width = width;
-        this.height = height;
+        this.width = Math.max(1, width);
+        this.height = Math.max(1, height);
 
-        GL11.glTexImage2D(this.target, 0, this.format.internal, width, height, 0, this.format.format, this.format.type, 0);
+        GL11.glTexImage2D(this.target, 0, this.format.internal, this.width, this.height, 0, this.format.format, this.format.type, 0);
     }
 
     public void updateTexture(Pixels pixels)

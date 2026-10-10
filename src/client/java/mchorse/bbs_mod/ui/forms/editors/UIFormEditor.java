@@ -590,7 +590,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         this.gizmoScale = this.createGizmoModeButton(Icons.SCALE, Gizmo.Mode.SCALE, UIKeys.FILM_GIZMO_SCALE);
         this.gizmoRotate = this.createGizmoModeButton(Icons.ARC, Gizmo.Mode.ROTATE, UIKeys.FILM_GIZMO_ROTATE);
         this.gizmoCombined = this.createGizmoModeButton(Icons.SHAPES, Gizmo.Mode.COMBINED, UIKeys.FILM_GIZMO_COMBINED);
-        this.gizmoTop = this.createGizmoModeButton(Icons.SPHERE, Gizmo.Mode.TOP, UIKeys.FILM_GIZMO_TOP);
+        this.gizmoTop = this.createGizmoModeButton(Icons.SPHERE, Gizmo.Mode.ROTATE, UIKeys.FILM_GIZMO_TOP);
 
         this.gizmoVisualSize = new UIIcon(Icons.MAXIMIZE, (b) ->
         {
@@ -628,6 +628,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.SIZE, this.gizmoVisualSize);
         this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.THICKNESS, this.gizmoThickness);
         this.gizmoButtonMap.put(ValueFormEditorGizmoToolbar.TRANSLATE_SPEED, this.gizmoTranslateSpeed);
+
 
         this.gizmoToolbar = new UIElement()
         {
@@ -712,6 +713,11 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
         }
 
         UIPropTransform editableTransform = this.getGizmoDragTransform();
+
+        if (editableTransform != null && editableTransform.getTransform() == null)
+        {
+            editableTransform = null;
+        }
 
         this.renderer.setPoseBoneGizmoDrag(this.isPoseBoneGizmo(editableTransform));
 
@@ -2122,7 +2128,7 @@ public class UIFormEditor extends UIElement implements IUIFormList, ICursor
     {
         UIPropTransform transform = this.getGizmoDragTransform();
 
-        if (transform == null || !transform.isGizmoEditing())
+        if (transform == null || transform.getTransform() == null || !transform.isGizmoEditing())
         {
             return;
         }

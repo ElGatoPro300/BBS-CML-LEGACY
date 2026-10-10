@@ -9,8 +9,6 @@ import mchorse.bbs_mod.ui.framework.elements.UIElement;
 import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
 import mchorse.bbs_mod.utils.MathUtils;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-
 import java.util.Random;
 
 /**
@@ -277,10 +275,8 @@ public class UIWelcomeCinematicIntro extends UIElement
         int cx = this.area.mx();
         int cy = this.area.my();
 
-        RenderSystem.enableBlend();
         int mainColor = (alpha << 24) | 0xffeedd;
         context.batcher.text(quote, cx - textW / 2, cy - textH / 2, mainColor, false);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void renderSkipPrompt(UIContext context, float elapsed, float curtainAlpha)

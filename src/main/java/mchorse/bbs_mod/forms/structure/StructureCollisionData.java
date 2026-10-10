@@ -6,7 +6,6 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.Registries;
 import net.minecraft.state.property.Property;
@@ -183,17 +182,27 @@ public final class StructureCollisionData
     {
         NbtCompound root = StructurePickerExporter.readStructureNbt(path);
 
-        if (root == null || !root.contains("blocks", NbtElement.LIST_TYPE) || !root.contains("palette", NbtElement.LIST_TYPE))
+        if (root == null || !root.contains("blocks") || !root.contains("palette"))
         {
             return null;
         }
 
         List<BlockState> palette = new ArrayList<>();
-        NbtList paletteNbt = root.getList("palette", NbtElement.COMPOUND_TYPE);
+        NbtList paletteNbt = root.getList("palette").orElse(null);
+
+        if (paletteNbt == null)
+        {
+            return empty();
+        }
 
         for (int i = 0; i < paletteNbt.size(); i++)
         {
-            palette.add(readBlockState(paletteNbt.getCompound(i)));
+            NbtCompound paletteEntry = paletteNbt.getCompound(i).orElse(null);
+
+            if (paletteEntry != null)
+            {
+                palette.add(readBlockState(paletteEntry));
+            }
         }
 
         int minX = Integer.MAX_VALUE;
@@ -205,13 +214,25 @@ public final class StructureCollisionData
         Set<Long> fullCubes = new HashSet<>();
         List<BlockPos> partialPos = new ArrayList<>();
         List<BlockState> partialStates = new ArrayList<>();
-        NbtList blocks = root.getList("blocks", NbtElement.COMPOUND_TYPE);
+        NbtList blocks = root.getList("blocks").orElse(null);
+
+        if (blocks == null)
+        {
+            return empty();
+        }
+
         boolean hasAny = false;
 
         for (int i = 0; i < blocks.size(); i++)
         {
-            NbtCompound entry = blocks.getCompound(i);
-            int stateIndex = entry.getInt("state");
+            NbtCompound entry = blocks.getCompound(i).orElse(null);
+
+            if (entry == null)
+            {
+                continue;
+            }
+
+            int stateIndex = entry.getInt("state").orElse(-1);
 
             if (stateIndex < 0 || stateIndex >= palette.size())
             {
@@ -225,14 +246,14 @@ public final class StructureCollisionData
                 continue;
             }
 
-            NbtList posList = entry.getList("pos", NbtElement.INT_TYPE);
+            NbtList posList = entry.getList("pos").orElse(null);
 
-            if (posList.size() < 3)
+            if (posList == null || posList.size() < 3)
             {
                 continue;
             }
 
-            BlockPos pos = new BlockPos(posList.getInt(0), posList.getInt(1), posList.getInt(2));
+            BlockPos pos = new BlockPos(posList.getInt(0).orElse(0), posList.getInt(1).orElse(0), posList.getInt(2).orElse(0));
 
             /* Bounds from all non-air blocks — same pivot basis as StructureFormRenderer. */
             hasAny = true;
@@ -512,7 +533,12 @@ public final class StructureCollisionData
 
     private static BlockState readBlockState(NbtCompound entry)
     {
-        String name = entry.getString("Name");
+        if (entry == null)
+        {
+            return Blocks.AIR.getDefaultState();
+        }
+
+        String name = entry.getString("Name").orElse("");
         Block block;
 
         try
@@ -536,35 +562,38 @@ public final class StructureCollisionData
 
         BlockState state = block.getDefaultState();
 
-        if (entry.contains("Properties", NbtElement.COMPOUND_TYPE))
+        if (entry.contains("Properties"))
         {
-            NbtCompound props = entry.getCompound("Properties");
+            NbtCompound props = entry.getCompound("Properties").orElse(null);
 
-            for (String key : props.getKeys())
+            if (props != null)
             {
-                String value = props.getString(key);
-                Property<?> property = block.getStateManager().getProperty(key);
-
-                if (property == null)
+                for (String key : props.getKeys())
                 {
-                    continue;
-                }
+                    String value = props.getString(key).orElse("");
+                    Property<?> property = block.getStateManager().getProperty(key);
 
-                Optional<?> parsed = property.parse(value);
-
-                if (parsed.isPresent())
-                {
-                    try
+                    if (property == null)
                     {
-                        @SuppressWarnings({"rawtypes", "unchecked"})
-                        Property raw = property;
-                        @SuppressWarnings("unchecked")
-                        Comparable c = (Comparable) parsed.get();
-
-                        state = state.with(raw, c);
+                        continue;
                     }
-                    catch (Exception ignored)
-                    {}
+
+                    Optional<?> parsed = property.parse(value);
+
+                    if (parsed.isPresent())
+                    {
+                        try
+                        {
+                            @SuppressWarnings({"rawtypes", "unchecked"})
+                            Property raw = property;
+                            @SuppressWarnings("unchecked")
+                            Comparable c = (Comparable) parsed.get();
+
+                            state = state.with(raw, c);
+                        }
+                        catch (Exception ignored)
+                        {}
+                    }
                 }
             }
         }

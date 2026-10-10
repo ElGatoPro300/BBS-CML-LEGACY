@@ -1,6 +1,9 @@
 package mchorse.bbs_mod.forms.renderers.utils;
 
+import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
+import mchorse.bbs_mod.client.BBSUniform;
+import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.cubic.ModelInstance;
 import mchorse.bbs_mod.graphics.Framebuffer;
 import mchorse.bbs_mod.graphics.texture.Texture;
@@ -12,13 +15,10 @@ import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.pose.Pose;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.MathHelper;
@@ -26,7 +26,8 @@ import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -188,14 +189,11 @@ public class FormOutlineRenderer
             framebuffer.bind();
             GL11.glViewport(0, 0, width, height);
 
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
-            RenderSystem.depthMask(false);
-            RenderSystem.disableBlend();
-            RenderSystem.enableCull();
-
-            client.gameRenderer.getLightmapTextureManager().enable();
-            client.gameRenderer.getOverlayTexture().setupOverlayColor();
+            GlStateManager._enableDepthTest();
+            GlStateManager._depthFunc(GL11.GL_LEQUAL);
+            GlStateManager._depthMask(false);
+            GlStateManager._disableBlend();
+            GlStateManager._enableCull();
 
             boolean polygonOffsetWasEnabled = GL11.glIsEnabled(GL11.GL_POLYGON_OFFSET_FILL);
 
@@ -214,9 +212,6 @@ public class FormOutlineRenderer
                 }
 
                 GL11.glPolygonOffset(0.0F, 0.0F);
-
-                client.gameRenderer.getLightmapTextureManager().disable();
-                client.gameRenderer.getOverlayTexture().teardownOverlayColor();
             }
 
             Texture maskTexture = framebuffer.getMainTexture();
@@ -228,28 +223,22 @@ public class FormOutlineRenderer
             GL11.glClearColor(0F, 0F, 0F, -1F);
             GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
 
-            RenderSystem.disableDepthTest();
-            RenderSystem.depthMask(false);
-            RenderSystem.disableBlend();
-            RenderSystem.disableCull();
+            GlStateManager._disableDepthTest();
+            GlStateManager._depthMask(false);
+            GlStateManager._disableBlend();
+            GlStateManager._disableCull();
 
-            RenderSystem.setShaderTexture(0, maskTexture.id);
-            RenderSystem.setShader(BBSShaders.getOutlineDilateH());
+            BBSRendering.bindProgram(dilateShader);
+            BBSUniform.set(dilateShader, "TexelSize", texelX, texelY);
+            BBSUniform.set(dilateShader, "Thickness", thickness);
+            BBSUniform.set(dilateShader, "Sampler0", 0);
 
-            GlUniform hTexelUniform = dilateShader.getUniform("TexelSize");
-            GlUniform hThicknessUniform = dilateShader.getUniform("Thickness");
-
-            if (hTexelUniform != null)
-            {
-                hTexelUniform.set(texelX, texelY);
-            }
-
-            if (hThicknessUniform != null)
-            {
-                hThicknessUniform.set(thickness);
-            }
+            maskTexture.bind(0);
 
             drawFullscreenQuad(0F);
+
+            BBSRendering.unbindProgram();
+            maskTexture.unbind(0);
 
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
             GL11.glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
@@ -261,85 +250,54 @@ public class FormOutlineRenderer
 
             Texture dilateTexture = dilateFramebuffer.getMainTexture();
 
-            RenderSystem.disableDepthTest();
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableCull();
+            GlStateManager._disableDepthTest();
+            GlStateManager._enableBlend();
+            GlStateManager._blendFuncSeparate(770, 771, 1, 0);
+            GlStateManager._disableCull();
 
-            RenderSystem.setShaderTexture(0, dilateTexture.id);
-            RenderSystem.setShaderTexture(1, maskTexture.id);
-            RenderSystem.setShader(BBSShaders.getOutlineComposite());
+            BBSRendering.bindProgram(compositeShader);
+            BBSUniform.set(compositeShader, "TexelSize", texelX, texelY);
+            BBSUniform.set(compositeShader, "Thickness", thickness);
+            BBSUniform.set(compositeShader, "OutlineMaskColor", outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a);
+            BBSUniform.set(compositeShader, "Rainbow", rainbow ? 1F : 0F);
+            BBSUniform.set(compositeShader, "RainbowSpeed", rainbowSpeed);
+            BBSUniform.set(compositeShader, "RainbowScale", rainbowScale);
+            BBSUniform.set(compositeShader, "GameTime", (float) ((System.currentTimeMillis() % 36000000L) / 1000.0));
+            BBSUniform.set(compositeShader, "Sampler0", 0);
+            BBSUniform.set(compositeShader, "Sampler1", 1);
 
-            GlUniform texelUniform = compositeShader.getUniform("TexelSize");
-            GlUniform thicknessUniform = compositeShader.getUniform("Thickness");
-
-            if (texelUniform != null)
-            {
-                texelUniform.set(texelX, texelY);
-            }
-
-            if (thicknessUniform != null)
-            {
-                thicknessUniform.set(thickness);
-            }
-
-            GlUniform colorUniform = compositeShader.getUniform("OutlineMaskColor");
-
-            if (colorUniform != null)
-            {
-                colorUniform.set(outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a);
-            }
-
-            GlUniform rainbowUniform = compositeShader.getUniform("Rainbow");
-            GlUniform speedUniform = compositeShader.getUniform("RainbowSpeed");
-            GlUniform scaleUniform = compositeShader.getUniform("RainbowScale");
-            GlUniform timeUniform = compositeShader.getUniform("GameTime");
-
-            if (rainbowUniform != null)
-            {
-                rainbowUniform.set(rainbow ? 1F : 0F);
-            }
-
-            if (speedUniform != null)
-            {
-                speedUniform.set(rainbowSpeed);
-            }
-
-            if (scaleUniform != null)
-            {
-                scaleUniform.set(rainbowScale);
-            }
-
-            if (timeUniform != null)
-            {
-                timeUniform.set((float) ((System.currentTimeMillis() % 36000000L) / 1000.0));
-            }
+            dilateTexture.bind(0);
+            maskTexture.bind(1);
 
             drawFullscreenQuad(0F);
+
+            BBSRendering.unbindProgram();
+            dilateTexture.unbind(0);
+            maskTexture.unbind(1);
         }
         finally
         {
-            RenderSystem.depthMask(savedDepthMask);
+            GlStateManager._depthMask(savedDepthMask);
 
             if (depthWasEnabled)
             {
-                RenderSystem.enableDepthTest();
+                GlStateManager._enableDepthTest();
             }
             else
             {
-                RenderSystem.disableDepthTest();
+                GlStateManager._disableDepthTest();
             }
 
             if (blendWasEnabled)
             {
-                RenderSystem.enableBlend();
+                GlStateManager._enableBlend();
             }
             else
             {
-                RenderSystem.disableBlend();
+                GlStateManager._disableBlend();
             }
 
-            RenderSystem.enableCull();
+            GlStateManager._enableCull();
 
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
             GL11.glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
@@ -398,14 +356,11 @@ public class FormOutlineRenderer
 
     private static void drawFullscreenQuad(float z)
     {
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
+        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
 
-        /* Two triangles covering the full screen in NDC space. */
+        /* Fullscreen quad in NDC space. */
         builder.vertex(-1F, -1F, z).texture(0F, 0F);
         builder.vertex(1F, -1F, z).texture(1F, 0F);
-        builder.vertex(1F, 1F, z).texture(1F, 1F);
-
-        builder.vertex(-1F, -1F, z).texture(0F, 0F);
         builder.vertex(1F, 1F, z).texture(1F, 1F);
         builder.vertex(-1F, 1F, z).texture(0F, 1F);
 
