@@ -11,7 +11,6 @@ import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.compat.HdrModCompat;
 import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
 import mchorse.bbs_mod.client.screen.ScreenEffectRenderer;
-import mchorse.bbs_mod.client.video.VideoRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.events.TriggerBlockEntityUpdateCallback;
@@ -229,16 +228,22 @@ public class BBSRendering
     public static File getVideoFolder()
     {
         File movies = new File(BBSMod.getSettingsFolder().getParentFile(), "movies");
-        File exportPath = new File(BBSSettings.videoSettings.path.get());
+        String configured = BBSSettings.videoSettings.path.get();
 
-        if (exportPath.isDirectory())
+        /* Java 25 treats new File("").isDirectory() as true (cwd). Skip blank paths. */
+        if (configured != null && !configured.trim().isEmpty())
         {
-            movies = exportPath;
+            File exportPath = new File(configured.trim());
+
+            if (exportPath.isDirectory())
+            {
+                movies = exportPath;
+            }
         }
 
         movies.mkdirs();
 
-        return movies;
+        return movies.getAbsoluteFile();
     }
 
     public static boolean canReplaceFramebuffer()
@@ -894,9 +899,8 @@ public class BBSRendering
             Matrix4f ortho = new Matrix4f().ortho(0, area.w, area.h, 0, -1000, 3000);
 
             RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
+            /* Videos (incl. global) are drawn inside ScreenEffectRenderer by renderOrder. */
             ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-            /* Global videos stay above all screen overlays (floating-reference path in editor). */
-            VideoRenderer.renderClips(batcher.getContext().getMatrices(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
 
             drawContext.draw();
 
@@ -914,7 +918,6 @@ public class BBSRendering
 
             RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
             ScreenEffectRenderer.render(batcher, controller.getContext(), area.w, area.h);
-            VideoRenderer.renderClips(batcher.getContext().getMatrices(), batcher, controller.getContext().clips.getClips(controller.getContext().relativeTick), controller.getContext().relativeTick, true, area, area, null, area.w, area.h, true);
 
             RenderSystem.setProjectionMatrix(cache, cacheType);
         }
@@ -935,12 +938,16 @@ public class BBSRendering
                 DrawContext drawContext = new DrawContext(mc, mc.getBufferBuilders().getEntityVertexConsumers());
                 Batcher2D offscreenBatcher = new Batcher2D(drawContext);
 
-                Window window = mc.getWindow();
-                Area fullScreen = new Area(0, 0, window.getScaledWidth(), window.getScaledHeight());
-                Matrix4f ortho = new Matrix4f().ortho(0, window.getScaledWidth(), window.getScaledHeight(), 0, -1000, 3000);
+                /* Use export/video size, not window scaled size: after renderingWorld=false,
+                 * WindowMixin no longer spoofs dimensions, so landscape window ortho into a
+                 * portrait export FBO would stretch Hotbar/BossBar (and similar) overlays. */
+                int screenW = getVideoWidth();
+                int screenH = getVideoHeight();
+                cache = new Matrix4f(RenderSystem.getProjectionMatrix());
+                Matrix4f ortho = new Matrix4f().ortho(0, screenW, screenH, 0, -1000, 3000);
 
                 RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
-                ScreenEffectRenderer.render(offscreenBatcher, panel.getRunner().getContext(), window.getScaledWidth(), window.getScaledHeight());
+                ScreenEffectRenderer.render(offscreenBatcher, panel.getRunner().getContext(), screenW, screenH);
 
                 drawContext.draw();
 

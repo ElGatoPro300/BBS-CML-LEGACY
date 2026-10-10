@@ -3,6 +3,8 @@ package mchorse.bbs_mod.camera.clips.misc;
 /**
  * Screen-space video draw request registered from {@link VideoClip#applyClip}.
  * Drawn by {@code ScreenEffectRenderer} in {@code renderOrder} with images/subtitles.
+ * {@code global} skips viewport scissor (can float outside the film preview), but still
+ * respects clip layer order.
  */
 public class VideoOverlay
 {
@@ -19,10 +21,11 @@ public class VideoOverlay
     public int cropHeight;
     public float opacity = 1F;
     public boolean loops;
+    public boolean global;
     public int renderOrder;
 
     public void update(String path, long videoTick, int volume, int x, int y, int width, int height,
-        int cropX, int cropY, int cropWidth, int cropHeight, float opacity, boolean loops, int renderOrder)
+        int cropX, int cropY, int cropWidth, int cropHeight, float opacity, boolean loops, boolean global, int renderOrder)
     {
         this.path = path == null ? "" : path;
         this.videoTick = videoTick;
@@ -37,6 +40,7 @@ public class VideoOverlay
         this.cropHeight = cropHeight;
         this.opacity = opacity;
         this.loops = loops;
+        this.global = global;
         this.renderOrder = renderOrder;
     }
 }

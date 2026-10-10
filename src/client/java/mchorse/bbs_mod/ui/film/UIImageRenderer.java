@@ -9,8 +9,6 @@ import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.utils.Quad;
 import mchorse.bbs_mod.utils.colors.Color;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.gl.ShaderProgramKeys;
@@ -35,16 +33,19 @@ public class UIImageRenderer
     private static final Quad uvQuad = new Quad();
     private static final Matrix4f matrix = new Matrix4f();
 
-    public static void renderImages(MatrixStack stack, Batcher2D batcher, List<ImageOverlay> images)
+    public static void renderImages(MatrixStack stack, Batcher2D batcher, List<ImageOverlay> images, int frameW, int frameH)
     {
-        if (images.isEmpty())
+        if (images.isEmpty() || frameW <= 0 || frameH <= 0)
         {
             return;
         }
 
-        Framebuffer fb = MinecraftClient.getInstance().getFramebuffer();
-        int width = fb.textureWidth / 2;
-        int height = fb.textureHeight / 2;
+        /* 2.1.2 used framebuffer texture size / 2 as the image ortho space. Size %
+         * still fills the viewport (half-space maps to full NDC); pixel x/y offsets
+         * stay in that half-space so films from 2.1.2 keep the same place. Do not
+         * share Hotbar's export-pixel offsets — those are a different unit. */
+        int width = frameW / 2;
+        int height = frameH / 2;
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
         ProjectionType savedProjType = RenderSystem.getProjectionType();
         /* X/Y rotations move quad corners into Z. The old ±100 near/far clipped
@@ -186,14 +187,14 @@ public class UIImageRenderer
         RenderSystem.enableCull();
     }
 
-    public static void renderImage(MatrixStack stack, Batcher2D batcher, ImageOverlay overlay)
+    public static void renderImage(MatrixStack stack, Batcher2D batcher, ImageOverlay overlay, int frameW, int frameH)
     {
         if (overlay == null)
         {
             return;
         }
 
-        renderImages(stack, batcher, Collections.singletonList(overlay));
+        renderImages(stack, batcher, Collections.singletonList(overlay), frameW, frameH);
     }
 
     private static float[] computeUV(ImageOverlay overlay, Texture texture)

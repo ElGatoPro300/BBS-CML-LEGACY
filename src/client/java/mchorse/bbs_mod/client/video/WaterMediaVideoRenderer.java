@@ -17,6 +17,8 @@ import org.joml.Matrix4f;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import org.lwjgl.opengl.GL11;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -75,42 +77,9 @@ public class WaterMediaVideoRenderer
             return;
         }
 
-        Area baseArea = area;
-        int actualW = getVideoWidth(video.video.get());
-        int actualH = getVideoHeight(video.video.get());
-
-        int baseW = baseArea.w;
-        int baseH = baseArea.h;
-
-        if (actualW > 0 && actualH > 0)
-        {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) baseArea.w / baseArea.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (baseArea.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (baseArea.h * videoAspect);
-            }
-        }
-
-        float widthPercent = video.width.get() / 100F;
-        float heightPercent = video.height.get() / 100F;
-
-        if (video.width.get() == 0 && video.height.get() == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-
-        int vx = baseArea.x + (baseArea.w - vw) / 2 + video.x.get();
-        int vy = baseArea.y + (baseArea.h - vh) / 2 + video.y.get();
+        int[] rect = layoutVideoRect(area.x, area.y, area.w, area.h,
+            video.width.get(), video.height.get(), video.x.get(), video.y.get(),
+            video.video.get());
 
         batcher.flush();
 
@@ -119,11 +88,15 @@ public class WaterMediaVideoRenderer
             tick - Math.round(video.tick.get()) + video.offset.get(),
             isRunning,
             video.volume.get(),
-            vx, vy, vw, vh, video.opacity.get(),
+            rect[0], rect[1], rect[2], rect[3], video.opacity.get(),
             video.cropX.get(), video.cropY.get(), video.cropWidth.get(), video.cropHeight.get(),
             video.loops.get());
     }
 
+    /**
+     * Legacy direct path kept for callers that still pass clip lists. Prefer
+     * {@link #renderOverlay} via {@code ScreenEffectRenderer} so layer order is respected.
+     */
     public static void renderClips(MatrixStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
     {
         for (Clip clip : clips)
@@ -137,21 +110,21 @@ public class WaterMediaVideoRenderer
                     continue;
                 }
 
-                /* Non-global layered video is drawn via ScreenEffectRenderer (renderOrder). */
-                if (!video.global.get())
-                {
-                    continue;
-                }
-
                 Area baseArea = (globalArea != null) ? globalArea : viewport;
 
-                renderVideoInArea(stack, batcher, video, tick, isRunning, baseArea, viewport, context, screenWidth, screenHeight, true);
+                renderVideoInArea(stack, batcher, video, tick, isRunning, baseArea, viewport, context, screenWidth, screenHeight, video.global.get());
             }
         }
     }
 
     /**
-     * Draw a non-global {@link VideoOverlay} registered during clip apply, using film viewport size.
+     * Draw a {@link VideoOverlay} registered during clip apply (respects {@code renderOrder}).
+     * Non-global clips are scissored to the film viewport; global skips scissor.
+     * <p>
+     * Must not use {@link Batcher2D#clip} / DrawContext scissor here: that path treats
+     * coordinates as GUI space and flips Y with the <em>window</em> framebuffer height.
+     * After the film world pass, {@code renderingWorld} is false so WindowMixin no longer
+     * spoofs size — on a portrait export FBO that wrongly crops the top of the video.
      */
     public static void renderOverlay(MatrixStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
     {
@@ -160,89 +133,65 @@ public class WaterMediaVideoRenderer
             return;
         }
 
-        int actualW = getVideoWidth(overlay.path);
-        int actualH = getVideoHeight(overlay.path);
-        int baseW = viewport.w;
-        int baseH = viewport.h;
+        int[] rect = layoutVideoRect(viewport.x, viewport.y, viewport.w, viewport.h,
+            overlay.width, overlay.height, overlay.x, overlay.y, overlay.path);
 
-        if (actualW > 0 && actualH > 0)
+        batcher.flush();
+
+        if (!overlay.global)
         {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) viewport.w / viewport.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (viewport.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (viewport.h * videoAspect);
-            }
+            enableFilmPixelScissor(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
         }
 
-        float widthPercent = overlay.width / 100F;
-        float heightPercent = overlay.height / 100F;
-
-        if (overlay.width == 0 && overlay.height == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-        int vx = viewport.x + (viewport.w - vw) / 2 + overlay.x;
-        int vy = viewport.y + (viewport.h - vh) / 2 + overlay.y;
-
-        batcher.clip(viewport.x, viewport.y, viewport.w, viewport.h, screenWidth, screenHeight);
         render(stack,
             overlay.path,
             overlay.videoTick,
             isRunning,
             overlay.volume,
-            vx, vy, vw, vh, overlay.opacity,
+            rect[0], rect[1], rect[2], rect[3], overlay.opacity,
             overlay.cropX, overlay.cropY, overlay.cropWidth, overlay.cropHeight,
             overlay.loops);
-        batcher.unclip(screenWidth, screenHeight);
+
+        if (!overlay.global)
+        {
+            RenderSystem.disableScissor();
+        }
+    }
+
+    /**
+     * Scissor in film/export pixel space mapped through the current GL viewport
+     * (correct for custom-size portrait/landscape FBOs).
+     */
+    private static void enableFilmPixelScissor(int x, int y, int w, int h, int frameW, int frameH)
+    {
+        if (frameW <= 0 || frameH <= 0 || w <= 0 || h <= 0)
+        {
+            return;
+        }
+
+        int[] vp = new int[4];
+
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, vp);
+
+        float sx = vp[2] / (float) frameW;
+        float sy = vp[3] / (float) frameH;
+        int glX = vp[0] + Math.round(x * sx);
+        int glY = vp[1] + Math.round((frameH - y - h) * sy);
+        int glW = Math.max(0, Math.round(w * sx));
+        int glH = Math.max(0, Math.round(h * sy));
+
+        RenderSystem.enableScissor(glX, glY, glW, glH);
     }
 
     private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
     {
-        int actualW = getVideoWidth(video.video.get());
-        int actualH = getVideoHeight(video.video.get());
-
-        int baseW = baseArea.w;
-        int baseH = baseArea.h;
-
-        if (actualW > 0 && actualH > 0)
-        {
-            float videoAspect = (float) actualW / actualH;
-            float areaAspect = (float) baseArea.w / baseArea.h;
-
-            if (videoAspect > areaAspect)
-            {
-                baseH = (int) (baseArea.w / videoAspect);
-            }
-            else
-            {
-                baseW = (int) (baseArea.h * videoAspect);
-            }
-        }
-
-        float widthPercent = video.width.get() / 100F;
-        float heightPercent = video.height.get() / 100F;
-
-        if (video.width.get() == 0 && video.height.get() == 0)
-        {
-            widthPercent = 1F;
-            heightPercent = 1F;
-        }
-
-        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
-        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
-
-        int vx = baseArea.x + (baseArea.w - vw) / 2 + video.x.get();
-        int vy = baseArea.y + (baseArea.h - vh) / 2 + video.y.get();
+        int[] rect = layoutVideoRect(baseArea.x, baseArea.y, baseArea.w, baseArea.h,
+            video.width.get(), video.height.get(), video.x.get(), video.y.get(),
+            video.video.get());
+        int vx = rect[0];
+        int vy = rect[1];
+        int vw = rect[2];
+        int vh = rect[3];
 
         if (!global)
         {
@@ -280,6 +229,54 @@ public class WaterMediaVideoRenderer
                 batcher.unclip(screenWidth, screenHeight);
             }
         }
+    }
+
+    /**
+     * Layout video into {@code area} relative to the current frame size (pre-ScreenOverlayLayout).
+     * Both size axes 0 = contain (video aspect) inside the area; otherwise W%/H% of the area
+     * and pixel offsets in frame space.
+     *
+     * @return {@code {vx, vy, vw, vh}}
+     */
+    private static int[] layoutVideoRect(int areaX, int areaY, int areaW, int areaH,
+        float widthPercent100, float heightPercent100, float offsetX, float offsetY, String videoPath)
+    {
+        int actualW = getVideoWidth(videoPath);
+        int actualH = getVideoHeight(videoPath);
+        int baseW = areaW;
+        int baseH = areaH;
+
+        if (actualW > 0 && actualH > 0)
+        {
+            float videoAspect = (float) actualW / actualH;
+            float areaAspect = (float) areaW / areaH;
+
+            if (videoAspect > areaAspect)
+            {
+                baseH = Math.round(areaW / videoAspect);
+            }
+            else
+            {
+                baseW = Math.round(areaH * videoAspect);
+            }
+        }
+
+        float widthPercent = widthPercent100 / 100F;
+        float heightPercent = heightPercent100 / 100F;
+
+        if (widthPercent100 == 0F && heightPercent100 == 0F)
+        {
+            widthPercent = 1F;
+            heightPercent = 1F;
+        }
+
+        int vw = widthPercent == 0F ? 0 : Math.max(1, Math.round(baseW * Math.abs(widthPercent))) * (widthPercent < 0F ? -1 : 1);
+        int vh = heightPercent == 0F ? 0 : Math.max(1, Math.round(baseH * Math.abs(heightPercent))) * (heightPercent < 0F ? -1 : 1);
+
+        int vx = areaX + (areaW - vw) / 2 + Math.round(offsetX);
+        int vy = areaY + (areaH - vh) / 2 + Math.round(offsetY);
+
+        return new int[] {vx, vy, vw, vh};
     }
 
     private static String resolveVideoPath(String path)
