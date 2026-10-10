@@ -101,7 +101,7 @@ public class UIWelcomeFFmpegSlide extends UIElement
             String text = "✖ " + UIKeys.WELCOME_FFMPEG_NOT_FOUND.get();
             context.batcher.text(text, cx - font.getWidth(text) / 2, statusY, 0xff5555, true);
 
-            String hint = font.limitToWidth(currentPath.isEmpty() ? "No path set" : currentPath, this.area.w - 40);
+            String hint = font.limitToWidth(currentPath.isEmpty() ? UIKeys.WELCOME_FFMPEG_NO_PATH.get() : currentPath, this.area.w - 40);
             context.batcher.text(hint, cx - font.getWidth(hint) / 2, statusY + 16, 0x888899, true);
         }
 
