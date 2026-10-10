@@ -275,7 +275,7 @@ public class UIWelcomeLayoutSlide extends UIElement
         if (w > 20)
         {
             float scale = 0.50F;
-            Matrix3x2fStack matrices = batcher.getContext().getMatrices();
+            Matrix3x2fStack matrices = batcher.getContext().pose();
             matrices.pushMatrix();
             matrices.scale(scale, scale);
             batcher.text(title, (x + 3) / scale, (y + 2.2F) / scale, 0xffe2e8f0, false);
@@ -427,7 +427,7 @@ public class UIWelcomeLayoutSlide extends UIElement
             if (clipW > 30)
             {
                 float scale = 0.42F;
-                Matrix3x2fStack matrices = batcher.getContext().getMatrices();
+                Matrix3x2fStack matrices = batcher.getContext().pose();
                 matrices.pushMatrix();
                 matrices.scale(scale, scale);
                 batcher.text(UIKeys.WELCOME_PANEL_IDLE_CLIP.get(), (x + 6) / scale, (clipY + 1.5F) / scale, 0xff042f1f, false);

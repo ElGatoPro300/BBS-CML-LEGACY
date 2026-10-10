@@ -9,9 +9,9 @@ import mchorse.bbs_mod.ui.items.UIStructurePickerPanel;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.joml.Matrices;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import org.joml.Vector3d;
 import org.joml.Vector3f;
@@ -87,7 +87,7 @@ public final class StructurePickerScaleGizmo
             return StructurePickerScaleGizmo.resizeDragAxis;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
 
         if (mc.player == null || !StructurePickerScaleGizmo.resizeGizmoActive)
         {
@@ -107,9 +107,9 @@ public final class StructurePickerScaleGizmo
      */
     public static float getHandleVisualScale(double x, double y, double z)
     {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Vec3d eye = StructurePickerScaleGizmo.getViewEye(mc);
-        double dist = eye.distanceTo(new Vec3d(x, y, z));
+        Minecraft mc = Minecraft.getInstance();
+        Vec3 eye = StructurePickerScaleGizmo.getViewEye(mc);
+        double dist = eye.distanceTo(new Vec3(x, y, z));
         float scale = (float) (dist / StructurePickerScaleGizmo.HANDLE_REF_DISTANCE);
 
         return MathUtils.clamp(scale, 0.7F, 7.5F);
@@ -183,7 +183,7 @@ public final class StructurePickerScaleGizmo
     /**
      * True when the look ray hits a corner cube or scale-axis gizmo of the active region.
      */
-    public static boolean isOverSelectionInteractable(MinecraftClient mc)
+    public static boolean isOverSelectionInteractable(Minecraft mc)
     {
         if (!StructurePickerScaleGizmo.hasScalableSelection() || !StructurePickerScaleGizmo.isActive())
         {
@@ -200,12 +200,12 @@ public final class StructurePickerScaleGizmo
         return StructurePickerScaleGizmo.pickAxisGizmo(mc) != null;
     }
 
-    public static boolean isOverSelectionCorner(MinecraftClient mc)
+    public static boolean isOverSelectionCorner(Minecraft mc)
     {
         return StructurePickerScaleGizmo.findCornerHit(mc, true) != null;
     }
 
-    public static boolean tryPickCubeCorner(MinecraftClient mc)
+    public static boolean tryPickCubeCorner(Minecraft mc)
     {
         CornerHit hit = StructurePickerScaleGizmo.findCornerHit(mc, true);
 
@@ -216,8 +216,8 @@ public final class StructurePickerScaleGizmo
 
         StructurePickerScaleGizmo.resizeGizmoActive = true;
         StructurePickerScaleGizmo.resizeRegionIndex = hit.regionIndex();
-        StructurePickerScaleGizmo.resizeFreeCorner = hit.isMax() ? hit.max().toImmutable() : hit.min().toImmutable();
-        StructurePickerScaleGizmo.resizeFixedCorner = hit.isMax() ? hit.min().toImmutable() : hit.max().toImmutable();
+        StructurePickerScaleGizmo.resizeFreeCorner = hit.isMax() ? hit.max().immutable() : hit.min().immutable();
+        StructurePickerScaleGizmo.resizeFixedCorner = hit.isMax() ? hit.min().immutable() : hit.max().immutable();
         StructurePickerScaleGizmo.resizeAnchorIsMax = hit.isMax();
         StructurePickerScaleGizmo.resizeDragAxis = null;
         StructurePickerScaleGizmo.resizeDragging = false;
@@ -226,7 +226,7 @@ public final class StructurePickerScaleGizmo
         return true;
     }
 
-    public static void tick(MinecraftClient mc, boolean leftPressed, boolean leftReleased, boolean leftDown)
+    public static void tick(Minecraft mc, boolean leftPressed, boolean leftReleased, boolean leftDown)
     {
         if (!StructurePickerScaleGizmo.hasScalableSelection())
         {
@@ -296,8 +296,8 @@ public final class StructurePickerScaleGizmo
 
         StructurePickerScaleGizmo.resizeGizmoActive = true;
         StructurePickerScaleGizmo.resizeRegionIndex = regionIndex;
-        StructurePickerScaleGizmo.resizeFreeCorner = useMaxCorner ? max.toImmutable() : min.toImmutable();
-        StructurePickerScaleGizmo.resizeFixedCorner = useMaxCorner ? min.toImmutable() : max.toImmutable();
+        StructurePickerScaleGizmo.resizeFreeCorner = useMaxCorner ? max.immutable() : min.immutable();
+        StructurePickerScaleGizmo.resizeFixedCorner = useMaxCorner ? min.immutable() : max.immutable();
         StructurePickerScaleGizmo.resizeAnchorIsMax = useMaxCorner;
         StructurePickerScaleGizmo.resizeDragAxis = null;
         StructurePickerScaleGizmo.resizeDragging = false;
@@ -319,13 +319,13 @@ public final class StructurePickerScaleGizmo
 
         if (StructurePickerScaleGizmo.resizeAnchorIsMax)
         {
-            StructurePickerScaleGizmo.resizeFreeCorner = max.toImmutable();
-            StructurePickerScaleGizmo.resizeFixedCorner = min.toImmutable();
+            StructurePickerScaleGizmo.resizeFreeCorner = max.immutable();
+            StructurePickerScaleGizmo.resizeFixedCorner = min.immutable();
         }
         else
         {
-            StructurePickerScaleGizmo.resizeFreeCorner = min.toImmutable();
-            StructurePickerScaleGizmo.resizeFixedCorner = max.toImmutable();
+            StructurePickerScaleGizmo.resizeFreeCorner = min.immutable();
+            StructurePickerScaleGizmo.resizeFixedCorner = max.immutable();
         }
     }
 
@@ -333,7 +333,7 @@ public final class StructurePickerScaleGizmo
     {
     }
 
-    private static CornerHit findCornerHit(MinecraftClient mc, boolean enlarged)
+    private static CornerHit findCornerHit(Minecraft mc, boolean enlarged)
     {
         if (StructurePickerClient.getRegions().isEmpty() || !StructurePickerScaleGizmo.hasScalableSelection())
         {
@@ -355,13 +355,13 @@ public final class StructurePickerScaleGizmo
             return null;
         }
 
-        Vec3d eye = StructurePickerScaleGizmo.getViewEye(mc);
-        Vec3d look = StructurePickerScaleGizmo.getViewLook(mc);
+        Vec3 eye = StructurePickerScaleGizmo.getViewEye(mc);
+        Vec3 look = StructurePickerScaleGizmo.getViewLook(mc);
         BlockPos adjusted = StructurePickerSelection.adjustSecond(region.first(), region.second(), region.mode());
         BlockPos min = StructurePickerSelection.min(region.first(), adjusted);
         BlockPos max = StructurePickerSelection.max(region.first(), adjusted);
-        Vec3d minCorner = new Vec3d(min.getX(), min.getY(), min.getZ());
-        Vec3d maxCorner = new Vec3d(max.getX() + 1, max.getY() + 1, max.getZ() + 1);
+        Vec3 minCorner = new Vec3(min.getX(), min.getY(), min.getZ());
+        Vec3 maxCorner = new Vec3(max.getX() + 1, max.getY() + 1, max.getZ() + 1);
         float scaleMin = StructurePickerScaleGizmo.getHandleVisualScale(minCorner.x, minCorner.y, minCorner.z);
         float scaleMax = StructurePickerScaleGizmo.getHandleVisualScale(maxCorner.x, maxCorner.y, maxCorner.z);
         double radiusMin;
@@ -403,7 +403,7 @@ public final class StructurePickerScaleGizmo
         return best;
     }
 
-    private static Vec3d getSelectionGizmoPoint()
+    private static Vec3 getSelectionGizmoPoint()
     {
         if (StructurePickerScaleGizmo.resizeFreeCorner == null)
         {
@@ -412,14 +412,14 @@ public final class StructurePickerScaleGizmo
 
         if (StructurePickerScaleGizmo.resizeAnchorIsMax)
         {
-            return new Vec3d(
+            return new Vec3(
                 StructurePickerScaleGizmo.resizeFreeCorner.getX() + 1,
                 StructurePickerScaleGizmo.resizeFreeCorner.getY() + 1,
                 StructurePickerScaleGizmo.resizeFreeCorner.getZ() + 1
             );
         }
 
-        return new Vec3d(
+        return new Vec3(
             StructurePickerScaleGizmo.resizeFreeCorner.getX(),
             StructurePickerScaleGizmo.resizeFreeCorner.getY(),
             StructurePickerScaleGizmo.resizeFreeCorner.getZ()
@@ -428,7 +428,7 @@ public final class StructurePickerScaleGizmo
 
     private static int readSelectionGizmoCoord(StructurePickerAxis axis)
     {
-        Vec3d point = StructurePickerScaleGizmo.getSelectionGizmoPoint();
+        Vec3 point = StructurePickerScaleGizmo.getSelectionGizmoPoint();
 
         if (point == null)
         {
@@ -438,15 +438,15 @@ public final class StructurePickerScaleGizmo
         return (int) Math.floor(axis == StructurePickerAxis.X ? point.x : (axis == StructurePickerAxis.Y ? point.y : point.z));
     }
 
-    private static void beginSelectionScaleDrag(MinecraftClient mc, StructurePickerAxis axis)
+    private static void beginSelectionScaleDrag(Minecraft mc, StructurePickerAxis axis)
     {
         StructurePickerClient.beginScaleStroke();
         StructurePickerScaleGizmo.resizeDragAxis = axis;
         StructurePickerScaleGizmo.resizeDragging = true;
 
-        Vec3d gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
-        Vec3d eye = StructurePickerScaleGizmo.getViewEye(mc);
-        Vec3d look = StructurePickerScaleGizmo.getViewLook(mc);
+        Vec3 gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
+        Vec3 eye = StructurePickerScaleGizmo.getViewEye(mc);
+        Vec3 look = StructurePickerScaleGizmo.getViewLook(mc);
         Double hit = gizmo == null ? null : StructurePickerScaleGizmo.projectLookOntoAxis(eye, look, gizmo, axis);
 
         if (hit != null)
@@ -459,17 +459,17 @@ public final class StructurePickerScaleGizmo
         }
     }
 
-    private static StructurePickerAxis pickAxisGizmo(MinecraftClient mc)
+    private static StructurePickerAxis pickAxisGizmo(Minecraft mc)
     {
-        Vec3d gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
+        Vec3 gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
 
         if (gizmo == null)
         {
             return null;
         }
 
-        Vec3d eye = StructurePickerScaleGizmo.getViewEye(mc);
-        Vec3d look = StructurePickerScaleGizmo.normalizeLook(StructurePickerScaleGizmo.getViewLook(mc));
+        Vec3 eye = StructurePickerScaleGizmo.getViewEye(mc);
+        Vec3 look = StructurePickerScaleGizmo.normalizeLook(StructurePickerScaleGizmo.getViewLook(mc));
 
         if (look == null)
         {
@@ -486,7 +486,7 @@ public final class StructurePickerScaleGizmo
 
         for (StructurePickerAxis axis : StructurePickerAxis.values())
         {
-            Vec3d shaftEnd = StructurePickerScaleGizmo.axisEnd(gizmo, axis, axisLength, positive);
+            Vec3 shaftEnd = StructurePickerScaleGizmo.axisEnd(gizmo, axis, axisLength, positive);
             double tipPick = StructurePickerScaleGizmo.screenSpacePickRadius(mc, eye, shaftEnd, StructurePickerScaleGizmo.GIZMO_TIP_PICK_PIXELS);
             double stemPick = Math.max(axisRadius, StructurePickerScaleGizmo.screenSpacePickRadius(mc, eye, shaftEnd, StructurePickerScaleGizmo.GIZMO_STEM_PICK_PIXELS));
             double distTip = StructurePickerScaleGizmo.distanceRayToPoint(eye, look, shaftEnd);
@@ -513,7 +513,7 @@ public final class StructurePickerScaleGizmo
         return best;
     }
 
-    private static void updateSelectionScaleDrag(MinecraftClient mc)
+    private static void updateSelectionScaleDrag(Minecraft mc)
     {
         if (!StructurePickerScaleGizmo.resizeDragging
             || StructurePickerScaleGizmo.resizeDragAxis == null
@@ -532,9 +532,9 @@ public final class StructurePickerScaleGizmo
         }
 
         StructurePickerAxis axis = StructurePickerScaleGizmo.resizeDragAxis;
-        Vec3d eye = StructurePickerScaleGizmo.getViewEye(mc);
-        Vec3d look = StructurePickerScaleGizmo.getViewLook(mc);
-        Vec3d gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
+        Vec3 eye = StructurePickerScaleGizmo.getViewEye(mc);
+        Vec3 look = StructurePickerScaleGizmo.getViewLook(mc);
+        Vec3 gizmo = StructurePickerScaleGizmo.getSelectionGizmoPoint();
 
         if (gizmo == null)
         {
@@ -580,7 +580,7 @@ public final class StructurePickerScaleGizmo
         BlockPos free = axis.write(StructurePickerScaleGizmo.resizeFreeCorner, nextFree);
 
         StructurePickerScaleGizmo.resizeDragOriginCoord = newCoord;
-        StructurePickerScaleGizmo.resizeFreeCorner = free.toImmutable();
+        StructurePickerScaleGizmo.resizeFreeCorner = free.immutable();
 
         /* Keep fixed/free aligned with min/max after a flip so gizmo polarity matches. */
         BlockPos min = StructurePickerSelection.min(free, StructurePickerScaleGizmo.resizeFixedCorner);
@@ -588,19 +588,19 @@ public final class StructurePickerScaleGizmo
 
         if (StructurePickerScaleGizmo.resizeAnchorIsMax)
         {
-            StructurePickerScaleGizmo.resizeFreeCorner = max.toImmutable();
-            StructurePickerScaleGizmo.resizeFixedCorner = min.toImmutable();
+            StructurePickerScaleGizmo.resizeFreeCorner = max.immutable();
+            StructurePickerScaleGizmo.resizeFixedCorner = min.immutable();
         }
         else
         {
-            StructurePickerScaleGizmo.resizeFreeCorner = min.toImmutable();
-            StructurePickerScaleGizmo.resizeFixedCorner = max.toImmutable();
+            StructurePickerScaleGizmo.resizeFreeCorner = min.immutable();
+            StructurePickerScaleGizmo.resizeFixedCorner = max.immutable();
         }
 
         if (flipped)
         {
             /* Re-seed from the new gizmo so the next frame does not jump after teleport. */
-            Vec3d gizmoAfter = StructurePickerScaleGizmo.getSelectionGizmoPoint();
+            Vec3 gizmoAfter = StructurePickerScaleGizmo.getSelectionGizmoPoint();
             Double hitAfter = gizmoAfter == null ? null : StructurePickerScaleGizmo.projectLookOntoAxis(eye, look, gizmoAfter, axis);
 
             if (hitAfter != null)
@@ -623,7 +623,7 @@ public final class StructurePickerScaleGizmo
         ));
     }
 
-    private static Vec3d axisEnd(Vec3d origin, StructurePickerAxis axis, double length, boolean positive)
+    private static Vec3 axisEnd(Vec3 origin, StructurePickerAxis axis, double length, boolean positive)
     {
         double signed = positive ? length : -length;
 
@@ -635,25 +635,25 @@ public final class StructurePickerScaleGizmo
         };
     }
 
-    private static double distanceRayToPoint(Vec3d eye, Vec3d look, Vec3d point)
+    private static double distanceRayToPoint(Vec3 eye, Vec3 look, Vec3 point)
     {
-        Vec3d toPoint = point.subtract(eye);
-        double along = toPoint.dotProduct(look);
+        Vec3 toPoint = point.subtract(eye);
+        double along = toPoint.dot(look);
 
         if (along < 0D)
         {
             return Double.MAX_VALUE;
         }
 
-        Vec3d closest = eye.add(look.multiply(along));
+        Vec3 closest = eye.add(look.scale(along));
 
         return closest.distanceTo(point);
     }
 
-    private static double distanceRayToSegment(Vec3d eye, Vec3d look, Vec3d a, Vec3d b)
+    private static double distanceRayToSegment(Vec3 eye, Vec3 look, Vec3 a, Vec3 b)
     {
-        Vec3d ab = b.subtract(a);
-        double abLenSq = ab.lengthSquared();
+        Vec3 ab = b.subtract(a);
+        double abLenSq = ab.lengthSqr();
 
         if (abLenSq < 1.0E-6D)
         {
@@ -661,10 +661,10 @@ public final class StructurePickerScaleGizmo
         }
 
         /* Closest approach between ray (eye + t*look) and segment (a + u*ab). */
-        Vec3d ao = a.subtract(eye);
-        double lookDotAb = look.dotProduct(ab);
-        double lookDotAo = look.dotProduct(ao);
-        double abDotAo = ab.dotProduct(ao);
+        Vec3 ao = a.subtract(eye);
+        double lookDotAb = look.dot(ab);
+        double lookDotAo = look.dot(ao);
+        double abDotAo = ab.dot(ao);
         double denom = 1D - lookDotAb * lookDotAb / abLenSq;
 
         if (Math.abs(denom) < 1.0E-6D)
@@ -678,13 +678,13 @@ public final class StructurePickerScaleGizmo
         t = Math.max(0D, t);
         u = Math.max(0D, Math.min(1D, u));
 
-        Vec3d onRay = eye.add(look.multiply(t));
-        Vec3d onSeg = a.add(ab.multiply(u));
+        Vec3 onRay = eye.add(look.scale(t));
+        Vec3 onSeg = a.add(ab.scale(u));
 
         return onRay.distanceTo(onSeg);
     }
 
-    private static Double projectLookOntoAxis(Vec3d eye, Vec3d look, Vec3d origin, StructurePickerAxis axis)
+    private static Double projectLookOntoAxis(Vec3 eye, Vec3 look, Vec3 origin, StructurePickerAxis axis)
     {
         double axisLook = axis.readLook(look);
 
@@ -693,15 +693,15 @@ public final class StructurePickerScaleGizmo
             return null;
         }
 
-        Vec3d planeNormal;
+        Vec3 planeNormal;
 
         if (axis == StructurePickerAxis.Y)
         {
-            planeNormal = new Vec3d(look.x, 0D, look.z);
+            planeNormal = new Vec3(look.x, 0D, look.z);
 
-            if (planeNormal.lengthSquared() < 1.0E-6D)
+            if (planeNormal.lengthSqr() < 1.0E-6D)
             {
-                planeNormal = new Vec3d(1D, 0D, 0D);
+                planeNormal = new Vec3(1D, 0D, 0D);
             }
             else
             {
@@ -710,34 +710,34 @@ public final class StructurePickerScaleGizmo
         }
         else
         {
-            planeNormal = new Vec3d(0D, 1D, 0D);
+            planeNormal = new Vec3(0D, 1D, 0D);
         }
 
-        double denom = look.dotProduct(planeNormal);
+        double denom = look.dot(planeNormal);
 
         if (Math.abs(denom) < 1.0E-6D)
         {
-            double t = (axis.read(BlockPos.ofFloored(origin)) + 0.5D - StructurePickerScaleGizmo.readVec(eye, axis)) / axisLook;
+            double t = (axis.read(BlockPos.containing(origin)) + 0.5D - StructurePickerScaleGizmo.readVec(eye, axis)) / axisLook;
 
             if (t < 0D)
             {
                 return null;
             }
 
-            return StructurePickerScaleGizmo.readVec(eye.add(look.multiply(t)), axis);
+            return StructurePickerScaleGizmo.readVec(eye.add(look.scale(t)), axis);
         }
 
-        double t = origin.subtract(eye).dotProduct(planeNormal) / denom;
+        double t = origin.subtract(eye).dot(planeNormal) / denom;
 
         if (t < 0D)
         {
             return null;
         }
 
-        return StructurePickerScaleGizmo.readVec(eye.add(look.multiply(t)), axis);
+        return StructurePickerScaleGizmo.readVec(eye.add(look.scale(t)), axis);
     }
 
-    private static double readVec(Vec3d v, StructurePickerAxis axis)
+    private static double readVec(Vec3 v, StructurePickerAxis axis)
     {
         return switch (axis)
         {
@@ -747,7 +747,7 @@ public final class StructurePickerScaleGizmo
         };
     }
 
-    private static Vec3d normalizeLook(Vec3d look)
+    private static Vec3 normalizeLook(Vec3 look)
     {
         double len = look.length();
 
@@ -756,14 +756,14 @@ public final class StructurePickerScaleGizmo
             return null;
         }
 
-        return look.multiply(1.0D / len);
+        return look.scale(1.0D / len);
     }
 
-    private static double screenSpacePickRadius(MinecraftClient mc, Vec3d eye, Vec3d point, double pixels)
+    private static double screenSpacePickRadius(Minecraft mc, Vec3 eye, Vec3 point, double pixels)
     {
         double dist = Math.max(0.35D, eye.distanceTo(point));
-        double screenH = Math.max(1, mc.getWindow().getFramebufferHeight());
-        double fovDeg = mc.options.getFov().getValue().doubleValue();
+        double screenH = Math.max(1, mc.getWindow().getHeight());
+        double fovDeg = mc.options.fov().get().doubleValue();
         double halfFov = Math.toRadians(fovDeg) * 0.5D;
         double worldPerPixel = (2.0D * dist * Math.tan(halfFov)) / screenH;
 
@@ -775,38 +775,38 @@ public final class StructurePickerScaleGizmo
         return Math.max(0.12D, visualSize * 0.5D * pad);
     }
 
-    private static Vec3d getViewEye(MinecraftClient mc)
+    private static Vec3 getViewEye(Minecraft mc)
     {
         if (UIStructurePickerPanel.isOpened())
         {
             Vector3d pos = BBSModClient.getCameraController().getPosition();
 
-            return new Vec3d(pos.x, pos.y, pos.z);
+            return new Vec3(pos.x, pos.y, pos.z);
         }
 
         if (mc.player != null)
         {
-            return mc.player.getEyePos();
+            return mc.player.getEyePosition();
         }
 
-        return Vec3d.ZERO;
+        return Vec3.ZERO;
     }
 
-    private static Vec3d getViewLook(MinecraftClient mc)
+    private static Vec3 getViewLook(Minecraft mc)
     {
         if (UIStructurePickerPanel.isOpened())
         {
             Camera camera = BBSModClient.getCameraController().camera;
             Vector3f look = Matrices.rotation(camera.rotation.x, MathUtils.PI - camera.rotation.y);
 
-            return new Vec3d(look.x, look.y, look.z);
+            return new Vec3(look.x, look.y, look.z);
         }
 
         if (mc.player != null)
         {
-            return mc.player.getRotationVec(1.0F);
+            return mc.player.getViewVector(1.0F);
         }
 
-        return new Vec3d(0.0D, 0.0D, 1.0D);
+        return new Vec3(0.0D, 0.0D, 1.0D);
     }
 }

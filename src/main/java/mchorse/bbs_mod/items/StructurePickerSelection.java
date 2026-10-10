@@ -1,10 +1,10 @@
 package mchorse.bbs_mod.items;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -16,6 +16,15 @@ import java.util.Set;
 public class StructurePickerSelection
 {
     public static BlockPos min(BlockPos a, BlockPos b)
+    {
+        return new BlockPos(
+            Math.min(a.getX(), b.getY()),
+            Math.min(a.getY(), b.getY()),
+            Math.min(a.getZ(), b.getZ())
+        );
+    }
+
+    public static BlockPos min(BlockPos a, BlockPos b, boolean dummy)
     {
         return new BlockPos(
             Math.min(a.getX(), b.getX()),
@@ -55,7 +64,7 @@ public class StructurePickerSelection
             return StructurePickerPlane.XZ;
         }
 
-        BlockPos min = StructurePickerSelection.min(first, second);
+        BlockPos min = StructurePickerSelection.min(first, second, true);
         BlockPos max = StructurePickerSelection.max(first, second);
 
         if (min.getY() == max.getY())
@@ -68,7 +77,7 @@ public class StructurePickerSelection
 
     public static StructurePickerAxis inferVerticalAxis(BlockPos first, BlockPos second)
     {
-        BlockPos min = StructurePickerSelection.min(first, second);
+        BlockPos min = StructurePickerSelection.min(first, second, true);
         BlockPos max = StructurePickerSelection.max(first, second);
 
         if (min.getX() == max.getX())
@@ -91,20 +100,20 @@ public class StructurePickerSelection
         return second;
     }
 
-    public static List<BlockPos> collect(World world, BlockPos first, BlockPos second, StructurePickerMode mode)
+    public static List<BlockPos> collect(Level world, BlockPos first, BlockPos second, StructurePickerMode mode)
     {
         return StructurePickerSelection.collect(world, first, second, mode, false);
     }
 
-    public static List<BlockPos> collect(World world, BlockPos first, BlockPos second, StructurePickerMode mode, boolean includeAir)
+    public static List<BlockPos> collect(Level world, BlockPos first, BlockPos second, StructurePickerMode mode, boolean includeAir)
     {
         return StructurePickerSelection.collect(world, first, second, mode, includeAir, null);
     }
 
-    public static List<BlockPos> collect(World world, BlockPos first, BlockPos second, StructurePickerMode mode, boolean includeAir, Direction triangleFacing)
+    public static List<BlockPos> collect(Level world, BlockPos first, BlockPos second, StructurePickerMode mode, boolean includeAir, Direction triangleFacing)
     {
         BlockPos adjusted = StructurePickerSelection.adjustSecond(first, second, mode);
-        BlockPos min = StructurePickerSelection.min(first, adjusted);
+        BlockPos min = StructurePickerSelection.min(first, adjusted, true);
         BlockPos max = StructurePickerSelection.max(first, adjusted);
         List<BlockPos> blocks = new ArrayList<>();
 
@@ -127,12 +136,12 @@ public class StructurePickerSelection
         return blocks;
     }
 
-    public static List<BlockPos> preview(World world, BlockPos first, BlockPos second, StructurePickerMode mode)
+    public static List<BlockPos> preview(Level world, BlockPos first, BlockPos second, StructurePickerMode mode)
     {
         return StructurePickerSelection.preview(world, first, second, mode, null);
     }
 
-    public static List<BlockPos> preview(World world, BlockPos first, BlockPos second, StructurePickerMode mode, Direction triangleFacing)
+    public static List<BlockPos> preview(Level world, BlockPos first, BlockPos second, StructurePickerMode mode, Direction triangleFacing)
     {
         if (first == null || second == null)
         {
@@ -140,7 +149,7 @@ public class StructurePickerSelection
         }
 
         BlockPos adjusted = StructurePickerSelection.adjustSecond(first, second, mode);
-        BlockPos min = StructurePickerSelection.min(first, adjusted);
+        BlockPos min = StructurePickerSelection.min(first, adjusted, true);
         BlockPos max = StructurePickerSelection.max(first, adjusted);
         List<BlockPos> blocks = new ArrayList<>();
 
@@ -176,6 +185,258 @@ public class StructurePickerSelection
             case CYLINDER -> StructurePickerSelection.inCircle(min, max, x, z);
             case BLOCK, SAME, BRUSH, ERASE -> x == min.getX() && y == min.getY() && z == min.getZ();
         };
+    }
+
+    /**
+     * Stamp a sphere/cube brush on the hit face plane. Radius spreads along the
+     * surface; depth goes inward from that face. Only the painted face is selected
+     * (e.g. a mountain wall), not the ground or interior volume. Plant covers
+     * (grass, flowers, tall grass) also pull in the solid block beneath them.
+     */
+    public static List<BlockPos> collectBrushSurface(Level world, BlockPos center, StructurePickerBrushShape shape, int radius, int depth, Direction face)
+    {
+        LinkedHashSet<BlockPos> blocks = new LinkedHashSet<>();
+
+        if (world == null || center == null || radius < 0)
+        {
+            return new ArrayList<>();
+        }
+
+        Direction outward = face == null ? Direction.UP : face;
+        Direction inward = outward.getOpposite();
+        Direction[] tangents = StructurePickerSelection.tangentAxes(outward);
+        int r = Math.max(0, radius);
+        int layers = Math.max(1, depth);
+        int scan = Math.max(1, r) + 2;
+
+        for (int u = -r; u <= r; u++)
+        {
+            for (int v = -r; v <= r; v++)
+            {
+                if (shape == StructurePickerBrushShape.SPHERE && u * u + v * v > r * r)
+                {
+                    continue;
+                }
+
+                BlockPos column = center.offset(tangents[0].getStepX() * u + tangents[1].getStepX() * v, tangents[0].getStepY() * u + tangents[1].getStepY() * v, tangents[0].getStepZ() * u + tangents[1].getStepZ() * v);
+                BlockPos surface = StructurePickerSelection.findFaceSurface(world, column, outward, inward, scan);
+
+                if (surface == null)
+                {
+                    continue;
+                }
+
+                for (int layer = 0; layer < layers; layer++)
+                {
+                    BlockPos pos = surface.relative(inward, layer);
+                    BlockState state = world.getBlockState(pos);
+
+                    if (state.isAir())
+                    {
+                        break;
+                    }
+
+                    blocks.add(pos.immutable());
+                    StructurePickerSelection.addPlantSupport(world, pos, blocks);
+                }
+            }
+        }
+
+        return new ArrayList<>(blocks);
+    }
+
+    private static Direction[] tangentAxes(Direction face)
+    {
+        return switch (face.getAxis())
+        {
+            case Y -> new Direction[] {Direction.EAST, Direction.SOUTH};
+            case X -> new Direction[] {Direction.UP, Direction.SOUTH};
+            case Z -> new Direction[] {Direction.UP, Direction.EAST};
+        };
+    }
+
+    /**
+     * Walk from the air side of {@code column} inward until air meets solid —
+     * that solid is the surface facing {@code outward}.
+     */
+    private static BlockPos findFaceSurface(Level world, BlockPos column, Direction outward, Direction inward, int scan)
+    {
+        BlockPos cursor = column.relative(outward, scan);
+
+        for (int i = 0; i < scan * 2 + 1; i++)
+        {
+            BlockPos next = cursor.relative(inward);
+            boolean cursorEmpty = StructurePickerSelection.isBrushEmpty(world, cursor);
+            boolean nextSolid = !StructurePickerSelection.isBrushEmpty(world, next);
+
+            if (cursorEmpty && nextSolid)
+            {
+                return next.immutable();
+            }
+
+            cursor = next;
+        }
+
+        return null;
+    }
+
+    /**
+     * Air and non-colliding fluids count as empty for surface finding; plants count
+     * as occupied so grass on dirt still forms a selectable surface.
+     */
+    private static boolean isBrushEmpty(Level world, BlockPos pos)
+    {
+        return world.getBlockState(pos).isAir();
+    }
+
+    private static boolean isPlantCover(Level world, BlockPos pos, BlockState state)
+    {
+        if (state.isAir() || state.isSolidRender())
+        {
+            return false;
+        }
+
+        return state.getFluidState().isEmpty();
+    }
+
+    private static void addPlantSupport(Level world, BlockPos pos, Set<BlockPos> out)
+    {
+        BlockState state = world.getBlockState(pos);
+
+        if (!StructurePickerSelection.isPlantCover(world, pos, state))
+        {
+            return;
+        }
+
+        BlockPos below = pos.below();
+
+        for (int i = 0; i < 4; i++)
+        {
+            BlockState belowState = world.getBlockState(below);
+
+            if (belowState.isAir())
+            {
+                return;
+            }
+
+            if (!StructurePickerSelection.isPlantCover(world, below, belowState))
+            {
+                out.add(below.immutable());
+
+                return;
+            }
+
+            below = below.below();
+        }
+    }
+
+    public static boolean isSurfaceBlock(Level world, BlockPos pos)
+    {
+        for (Direction direction : Direction.values())
+        {
+            if (world.getBlockState(pos.relative(direction)).isAir())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Face-connected flood fill of the same block type (ignores blockstate properties
+     * so e.g. rotated logs still connect).
+     */
+    public static List<BlockPos> collectConnectedSame(Level world, BlockPos origin, int maxBlocks)
+    {
+        List<BlockPos> found = new ArrayList<>();
+
+        if (world == null || origin == null || maxBlocks <= 0)
+        {
+            return found;
+        }
+
+        BlockState originState = world.getBlockState(origin);
+        Block match = originState.getBlock();
+
+        if (originState.isAir())
+        {
+            return found;
+        }
+
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        Set<Long> visited = new HashSet<>();
+
+        queue.add(origin.immutable());
+        visited.add(origin.asLong());
+
+        while (!queue.isEmpty() && found.size() < maxBlocks)
+        {
+            BlockPos pos = queue.removeFirst();
+
+            if (world.getBlockState(pos).getBlock() != match)
+            {
+                continue;
+            }
+
+            found.add(pos);
+
+            for (Direction direction : Direction.values())
+            {
+                BlockPos next = pos.relative(direction);
+                long key = next.asLong();
+
+                if (visited.add(key))
+                {
+                    queue.add(next.immutable());
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /**
+     * Volumetric brush around {@code center}: solid blocks inside the sphere/cube of {@code radius}.
+     * {@code depth} is kept for UI compatibility and enlarges the brush when greater than {@code radius}.
+     */
+    public static List<BlockPos> collectBrushVolume(Level world, BlockPos center, StructurePickerBrushShape shape, int radius, int depth)
+    {
+        LinkedHashSet<BlockPos> blocks = new LinkedHashSet<>();
+
+        if (world == null || center == null || radius < 0)
+        {
+            return new ArrayList<>();
+        }
+
+        int r = Math.max(0, Math.max(radius, depth - 1));
+
+        for (int dx = -r; dx <= r; dx++)
+        {
+            for (int dy = -r; dy <= r; dy++)
+            {
+                for (int dz = -r; dz <= r; dz++)
+                {
+                    if (shape == StructurePickerBrushShape.SPHERE && dx * dx + dy * dy + dz * dz > r * r)
+                    {
+                        continue;
+                    }
+
+                    BlockPos pos = center.offset(dx, dy, dz);
+                    BlockState state = world.getBlockState(pos);
+
+                    if (state.isAir())
+                    {
+                        continue;
+                    }
+
+                    blocks.add(pos.immutable());
+                    StructurePickerSelection.addPlantSupport(world, pos, blocks);
+                }
+            }
+        }
+
+        return new ArrayList<>(blocks);
     }
 
     private static boolean onFlatPlane(BlockPos first, BlockPos second, BlockPos min, BlockPos max, int x, int y, int z)
@@ -241,8 +502,8 @@ public class StructurePickerSelection
 
         if (plane == StructurePickerPlane.XZ)
         {
-            forwardA = triangleFacing.getOffsetX();
-            forwardB = triangleFacing.getOffsetZ();
+            forwardA = triangleFacing.getStepX();
+            forwardB = triangleFacing.getStepZ();
         }
         else
         {
@@ -250,13 +511,13 @@ public class StructurePickerSelection
 
             if (locked == StructurePickerAxis.Z)
             {
-                forwardA = triangleFacing.getOffsetX();
-                forwardB = triangleFacing.getOffsetY();
+                forwardA = triangleFacing.getStepX();
+                forwardB = triangleFacing.getStepY();
             }
             else
             {
-                forwardA = triangleFacing.getOffsetZ();
-                forwardB = triangleFacing.getOffsetY();
+                forwardA = triangleFacing.getStepZ();
+                forwardB = triangleFacing.getStepY();
             }
         }
 
@@ -448,142 +709,5 @@ public class StructurePickerSelection
         double dz = z + 0.5D - cz;
 
         return t >= 0D && t <= 1D && dx * dx + dz * dz <= radius * radius;
-    }
-
-    /**
-     * Face-connected flood fill of the same block type (ignores blockstate properties
-     * so e.g. rotated logs still connect).
-     */
-    public static List<BlockPos> collectConnectedSame(World world, BlockPos origin, int maxBlocks)
-    {
-        List<BlockPos> found = new ArrayList<>();
-
-        if (world == null || origin == null || maxBlocks <= 0)
-        {
-            return found;
-        }
-
-        BlockState originState = world.getBlockState(origin);
-        Block match = originState.getBlock();
-
-        if (originState.isAir())
-        {
-            return found;
-        }
-
-        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
-        Set<Long> visited = new HashSet<>();
-
-        queue.add(origin.toImmutable());
-        visited.add(origin.asLong());
-
-        while (!queue.isEmpty() && found.size() < maxBlocks)
-        {
-            BlockPos pos = queue.removeFirst();
-
-            if (world.getBlockState(pos).getBlock() != match)
-            {
-                continue;
-            }
-
-            found.add(pos);
-
-            for (Direction direction : Direction.values())
-            {
-                BlockPos next = pos.offset(direction);
-                long key = next.asLong();
-
-                if (visited.add(key))
-                {
-                    queue.add(next.toImmutable());
-                }
-            }
-        }
-
-        return found;
-    }
-
-    /**
-     * Volumetric brush around {@code center}: solid blocks inside the sphere/cube of {@code radius}.
-     * {@code depth} is kept for UI compatibility and enlarges the brush when greater than {@code radius}.
-     */
-    public static List<BlockPos> collectBrushVolume(World world, BlockPos center, StructurePickerBrushShape shape, int radius, int depth)
-    {
-        LinkedHashSet<BlockPos> blocks = new LinkedHashSet<>();
-
-        if (world == null || center == null || radius < 0)
-        {
-            return new ArrayList<>();
-        }
-
-        int r = Math.max(0, Math.max(radius, depth - 1));
-
-        for (int dx = -r; dx <= r; dx++)
-        {
-            for (int dy = -r; dy <= r; dy++)
-            {
-                for (int dz = -r; dz <= r; dz++)
-                {
-                    if (shape == StructurePickerBrushShape.SPHERE && dx * dx + dy * dy + dz * dz > r * r)
-                    {
-                        continue;
-                    }
-
-                    BlockPos pos = center.add(dx, dy, dz);
-                    BlockState state = world.getBlockState(pos);
-
-                    if (state.isAir())
-                    {
-                        continue;
-                    }
-
-                    blocks.add(pos.toImmutable());
-                    StructurePickerSelection.addPlantSupport(world, pos, blocks);
-                }
-            }
-        }
-
-        return new ArrayList<>(blocks);
-    }
-
-    private static boolean isPlantCover(World world, BlockPos pos, BlockState state)
-    {
-        if (state.isAir() || !state.getCollisionShape(world, pos).isEmpty())
-        {
-            return false;
-        }
-
-        return !state.getFluidState().isStill();
-    }
-
-    private static void addPlantSupport(World world, BlockPos pos, Set<BlockPos> out)
-    {
-        BlockState state = world.getBlockState(pos);
-
-        if (!StructurePickerSelection.isPlantCover(world, pos, state))
-        {
-            return;
-        }
-
-        BlockPos below = pos.down();
-
-        for (int i = 0; i < 4; i++)
-        {
-            BlockState belowState = world.getBlockState(below);
-
-            if (belowState.isAir())
-            {
-                return;
-            }
-
-            if (!StructurePickerSelection.isPlantCover(world, below, belowState))
-            {
-                out.add(below.toImmutable());
-
-                return;
-            }
-
-            below = below.down();
-        }
     }
 }

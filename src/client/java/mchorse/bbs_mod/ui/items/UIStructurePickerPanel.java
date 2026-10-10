@@ -28,8 +28,8 @@ import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.Direction;
 import mchorse.bbs_mod.utils.colors.Colors;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -110,8 +110,8 @@ public class UIStructurePickerPanel extends UIOverlayPanel
 
         UIStructurePickerPanel.opened = panel;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        Screen returnScreen = client.currentScreen;
+        Minecraft client = Minecraft.getInstance();
+        Screen returnScreen = client.screen;
 
         panel.onClose((event) ->
         {
@@ -170,7 +170,7 @@ public class UIStructurePickerPanel extends UIOverlayPanel
             return true;
         }
 
-        Screen currentScreen = MinecraftClient.getInstance().currentScreen;
+        Screen currentScreen = Minecraft.getInstance().screen;
 
         if (!(currentScreen instanceof UIScreen uiScreen))
         {

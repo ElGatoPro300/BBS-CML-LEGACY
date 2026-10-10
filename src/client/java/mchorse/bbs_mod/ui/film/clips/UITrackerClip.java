@@ -28,7 +28,7 @@ import mchorse.bbs_mod.utils.clips.Clips;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
 
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 import org.joml.Vector3d;
 
@@ -322,7 +322,7 @@ public class UITrackerClip extends UIClip<TrackerClientClip>
 
     private float getClipTick()
     {
-        return MathHelper.clamp(this.editor.getCursor() - Math.round(this.clip.tick.get()), 0, this.clip.duration.get());
+        return Mth.clamp(this.editor.getCursor() - Math.round(this.clip.tick.get()), 0, this.clip.duration.get());
     }
 
     private TrackerFrame resolveFrame(Position position)

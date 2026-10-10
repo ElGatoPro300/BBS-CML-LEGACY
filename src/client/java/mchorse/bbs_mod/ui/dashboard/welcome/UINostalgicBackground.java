@@ -473,26 +473,26 @@ public class UINostalgicBackground
 
     private static void pushQuad(GuiQuadMesh mesh, float x, float y, float w, float h, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        mesh.vertex(x, y, 0).color(cTopLeft);
-        mesh.vertex(x, y + h, 0).color(cBotLeft);
-        mesh.vertex(x + w, y + h, 0).color(cBotRight);
-        mesh.vertex(x + w, y, 0).color(cTopRight);
+        mesh.addVertex(x, y, 0).setColor(cTopLeft);
+        mesh.addVertex(x, y + h, 0).setColor(cBotLeft);
+        mesh.addVertex(x + w, y + h, 0).setColor(cBotRight);
+        mesh.addVertex(x + w, y, 0).setColor(cTopRight);
     }
 
     private static void pushQuadPoints(GuiQuadMesh mesh, float x1, float y1, float x2, float y2, int cTopLeft, int cTopRight, int cBotLeft, int cBotRight)
     {
-        mesh.vertex(x1, y1, 0).color(cTopLeft);
-        mesh.vertex(x1, y2, 0).color(cBotLeft);
-        mesh.vertex(x2, y2, 0).color(cBotRight);
-        mesh.vertex(x2, y1, 0).color(cTopRight);
+        mesh.addVertex(x1, y1, 0).setColor(cTopLeft);
+        mesh.addVertex(x1, y2, 0).setColor(cBotLeft);
+        mesh.addVertex(x2, y2, 0).setColor(cBotRight);
+        mesh.addVertex(x2, y1, 0).setColor(cTopRight);
     }
 
     private static void pushQuadSkewed(GuiQuadMesh mesh, float xTL, float yTL, float xTR, float yTR, float xBL, float yBL, float xBR, float yBR, int cTL, int cTR, int cBL, int cBR)
     {
-        mesh.vertex(xTL, yTL, 0).color(cTL);
-        mesh.vertex(xBL, yBL, 0).color(cBL);
-        mesh.vertex(xBR, yBR, 0).color(cBR);
-        mesh.vertex(xTR, yTR, 0).color(cTR);
+        mesh.addVertex(xTL, yTL, 0).setColor(cTL);
+        mesh.addVertex(xBL, yBL, 0).setColor(cBL);
+        mesh.addVertex(xBR, yBR, 0).setColor(cBR);
+        mesh.addVertex(xTR, yTR, 0).setColor(cTR);
     }
 
     private static void pushSmoothRadialGlow(GuiQuadMesh mesh, float cx, float cy, float radius, int centerColor)

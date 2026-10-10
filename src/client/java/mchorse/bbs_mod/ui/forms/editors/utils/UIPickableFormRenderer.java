@@ -2,6 +2,7 @@ package mchorse.bbs_mod.ui.forms.editors.utils;
 
 import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.renderer.LightTexture;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.forms.Form;
@@ -27,13 +28,13 @@ import mchorse.bbs_mod.ui.utils.gizmo.GizmoSurface;
 import mchorse.bbs_mod.utils.MatrixStackUtils;
 import mchorse.bbs_mod.utils.Pair;
 
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 
 import org.joml.Matrix4f;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -196,14 +197,14 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
 
         IEntity previewEntity = this.target == null ? this.entity : this.target;
         int previewLight = BBSRendering.resolveEntityBlockLight(
-            previewEntity, LightmapTextureManager.pack(15, 15));
+            previewEntity, LightTexture.pack(15, 15));
         /* F7 / world mesh on: seed world stack like ENTITY (player/block pose) and match
          * Framebuffer look-at to the live world draw. Orbit mesh-only keeps PREVIEW. */
         boolean worldAlignedGizmos = !this.shouldRenderFormMesh();
         FormRenderType previewType = worldAlignedGizmos ? FormRenderType.ENTITY : FormRenderType.PREVIEW;
 
         FormRenderingContext formContext = new FormRenderingContext()
-            .set(previewType, previewEntity, this.createCameraStack(), previewLight, OverlayTexture.DEFAULT_UV, context.getTransition())
+            .set(previewType, previewEntity, this.createCameraStack(), previewLight, OverlayTexture.NO_OVERLAY, context.getTransition())
             .camera(this.camera)
             .modelRenderer()
             .equipment(BBSSettings.previewEquipment == null || BBSSettings.previewEquipment.get());
@@ -274,19 +275,19 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
             this.stencil.bindForPick();
 
             Matrix4f matrix = this.formEditor.getOrigin(context.getTransition());
-            MatrixStack stack = this.createCameraStack();
+            PoseStack stack = this.createCameraStack();
 
-            stack.push();
+            stack.pushPose();
 
             if (matrix != null)
             {
                 MatrixStackUtils.multiply(stack, matrix);
             }
 
-            this.unscaledGizmoMatrix.set(stack.peek().getPositionMatrix());
+            this.unscaledGizmoMatrix.set(stack.last().pose());
 
-            Matrix4f normalized = GizmoMatrixUtils.normalizeBasis(new Matrix4f(stack.peek().getPositionMatrix()));
-            stack.peek().getPositionMatrix().set(normalized);
+            Matrix4f normalized = GizmoMatrixUtils.normalizeBasis(new Matrix4f(stack.last().pose()));
+            stack.last().pose().set(normalized);
 
             if (Gizmo.isInteractive())
             {
@@ -296,7 +297,7 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
                 GlStateManager._enableCull();
             }
 
-            stack.pop();
+            stack.popPose();
 
             if (this.area.isInside(context))
             {
@@ -332,7 +333,7 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
     private void prepareGizmoRenderState()
     {
         GlStateManager._depthMask(true);
-        GlStateManager._colorMask(true, true, true, true);
+        GlStateManager._colorMask(ColorTargetState.WRITE_ALL);
         GlStateManager._enableDepthTest();
         GlStateManager._depthFunc(GL11.GL_LEQUAL);
         GlStateManager._disableBlend();
@@ -343,20 +344,20 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
     private void renderAxes(UIContext context)
     {
         Matrix4f matrix = this.formEditor.getOrigin(context.getTransition());
-        MatrixStack stack = this.createCameraStack();
+        PoseStack stack = this.createCameraStack();
         this.hasGizmoMatrix = true;
 
-        stack.push();
+        stack.pushPose();
 
         if (matrix != null)
         {
             MatrixStackUtils.multiply(stack, matrix);
         }
 
-        this.unscaledGizmoMatrix.set(stack.peek().getPositionMatrix());
+        this.unscaledGizmoMatrix.set(stack.last().pose());
 
-        Matrix4f normalized = GizmoMatrixUtils.normalizeBasis(new Matrix4f(stack.peek().getPositionMatrix()));
-        stack.peek().getPositionMatrix().set(normalized);
+        Matrix4f normalized = GizmoMatrixUtils.normalizeBasis(new Matrix4f(stack.last().pose()));
+        stack.last().pose().set(normalized);
 
         /* Full drawn MV so drag matches film (view-space rays ↔ view-space gizmo). */
         this.lastGizmoMatrix.set(normalized);
@@ -371,7 +372,7 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
             GlStateManager._enableCull();
         }
 
-        stack.pop();
+        stack.popPose();
     }
 
     @Override
@@ -451,7 +452,7 @@ public class UIPickableFormRenderer extends UIFormRenderer implements GizmoSurfa
         float hitboxH = this.form.hitboxHeight.get();
         float eyeHeight = hitboxH * this.form.hitboxEyeHeight.get();
 
-        MatrixStack stack = this.createCameraStack();
+        PoseStack stack = this.createCameraStack();
 
         /* Draw look vector */
         final float thickness = 0.01F;

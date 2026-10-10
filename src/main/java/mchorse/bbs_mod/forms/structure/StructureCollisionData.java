@@ -2,18 +2,18 @@ package mchorse.bbs_mod.forms.structure;
 
 import mchorse.bbs_mod.items.StructurePickerExporter;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.Registries;
-import net.minecraft.state.property.Property;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.world.EmptyBlockView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -42,11 +42,11 @@ public final class StructureCollisionData
     private static final int CELL = 4;
     private static final ThreadLocal<BitSet> QUERY_SEEN = ThreadLocal.withInitial(BitSet::new);
 
-    public final List<Box> localBoxes;
-    public final Box localBounds;
+    public final List<AABB> localBoxes;
+    public final AABB localBounds;
     private final Map<Long, int[]> spatialGrid;
 
-    private StructureCollisionData(List<Box> localBoxes, Box localBounds, Map<Long, int[]> spatialGrid)
+    private StructureCollisionData(List<AABB> localBoxes, AABB localBounds, Map<Long, int[]> spatialGrid)
     {
         this.localBoxes = List.copyOf(localBoxes);
         this.localBounds = localBounds;
@@ -111,7 +111,7 @@ public final class StructureCollisionData
      * Invoke {@code consumer} for every local box whose AABB intersects {@code localQuery}.
      * Uses a coarse spatial grid so large structures only touch nearby cells.
      */
-    public void forEachOverlapping(Box localQuery, Consumer<Box> consumer)
+    public void forEachOverlapping(AABB localQuery, Consumer<AABB> consumer)
     {
         if (this.localBoxes.isEmpty() || !this.localBounds.intersects(localQuery))
         {
@@ -120,7 +120,7 @@ public final class StructureCollisionData
 
         if (this.spatialGrid.isEmpty() || this.localBoxes.size() <= 24)
         {
-            for (Box local : this.localBoxes)
+            for (AABB local : this.localBoxes)
             {
                 if (local.intersects(localQuery))
                 {
@@ -162,7 +162,7 @@ public final class StructureCollisionData
                         }
 
                         seen.set(index);
-                        Box local = this.localBoxes.get(index);
+                        AABB local = this.localBoxes.get(index);
 
                         if (local.intersects(localQuery))
                         {
@@ -180,7 +180,7 @@ public final class StructureCollisionData
      */
     private static StructureCollisionData build(String path)
     {
-        NbtCompound root = StructurePickerExporter.readStructureNbt(path);
+        CompoundTag root = StructurePickerExporter.readStructureNbt(path);
 
         if (root == null || !root.contains("blocks") || !root.contains("palette"))
         {
@@ -188,7 +188,7 @@ public final class StructureCollisionData
         }
 
         List<BlockState> palette = new ArrayList<>();
-        NbtList paletteNbt = root.getList("palette").orElse(null);
+        ListTag paletteNbt = root.getList("palette").orElse(null);
 
         if (paletteNbt == null)
         {
@@ -197,7 +197,7 @@ public final class StructureCollisionData
 
         for (int i = 0; i < paletteNbt.size(); i++)
         {
-            NbtCompound paletteEntry = paletteNbt.getCompound(i).orElse(null);
+            CompoundTag paletteEntry = paletteNbt.getCompound(i).orElse(null);
 
             if (paletteEntry != null)
             {
@@ -214,7 +214,7 @@ public final class StructureCollisionData
         Set<Long> fullCubes = new HashSet<>();
         List<BlockPos> partialPos = new ArrayList<>();
         List<BlockState> partialStates = new ArrayList<>();
-        NbtList blocks = root.getList("blocks").orElse(null);
+        ListTag blocks = root.getList("blocks").orElse(null);
 
         if (blocks == null)
         {
@@ -225,7 +225,7 @@ public final class StructureCollisionData
 
         for (int i = 0; i < blocks.size(); i++)
         {
-            NbtCompound entry = blocks.getCompound(i).orElse(null);
+            CompoundTag entry = blocks.getCompound(i).orElse(null);
 
             if (entry == null)
             {
@@ -246,7 +246,7 @@ public final class StructureCollisionData
                 continue;
             }
 
-            NbtList posList = entry.getList("pos").orElse(null);
+            ListTag posList = entry.getList("pos").orElse(null);
 
             if (posList == null || posList.size() < 3)
             {
@@ -264,7 +264,7 @@ public final class StructureCollisionData
             maxY = Math.max(maxY, pos.getY());
             maxZ = Math.max(maxZ, pos.getZ());
 
-            VoxelShape shape = state.getCollisionShape(EmptyBlockView.INSTANCE, BlockPos.ORIGIN);
+            VoxelShape shape = state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
 
             if (shape.isEmpty())
             {
@@ -299,7 +299,7 @@ public final class StructureCollisionData
         pivotX -= parityX;
         pivotZ -= parityZ;
 
-        List<Box> boxes = new ArrayList<>();
+        List<AABB> boxes = new ArrayList<>();
         double boundsMinX = Double.POSITIVE_INFINITY;
         double boundsMinY = Double.POSITIVE_INFINITY;
         double boundsMinZ = Double.POSITIVE_INFINITY;
@@ -307,9 +307,9 @@ public final class StructureCollisionData
         double boundsMaxY = Double.NEGATIVE_INFINITY;
         double boundsMaxZ = Double.NEGATIVE_INFINITY;
 
-        for (Box merged : greedyMergeFullCubes(fullCubes))
+        for (AABB merged : greedyMergeFullCubes(fullCubes))
         {
-            Box local = new Box(
+            AABB local = new AABB(
                 merged.minX - pivotX,
                 merged.minY - pivotY,
                 merged.minZ - pivotZ,
@@ -331,11 +331,11 @@ public final class StructureCollisionData
         {
             BlockPos pos = partialPos.get(i);
             BlockState state = partialStates.get(i);
-            VoxelShape shape = state.getCollisionShape(EmptyBlockView.INSTANCE, BlockPos.ORIGIN);
+            VoxelShape shape = state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
 
-            for (Box part : shape.getBoundingBoxes())
+            for (AABB part : shape.toAabbs())
             {
-                Box local = new Box(
+                AABB local = new AABB(
                     pos.getX() - pivotX + part.minX,
                     pos.getY() - pivotY + part.minY,
                     pos.getZ() - pivotZ + part.minZ,
@@ -359,26 +359,26 @@ public final class StructureCollisionData
             return empty();
         }
 
-        Box bounds = new Box(boundsMinX, boundsMinY, boundsMinZ, boundsMaxX, boundsMaxY, boundsMaxZ);
+        AABB bounds = new AABB(boundsMinX, boundsMinY, boundsMinZ, boundsMaxX, boundsMaxY, boundsMaxZ);
 
         return new StructureCollisionData(boxes, bounds, buildSpatialGrid(boxes));
     }
 
     private static StructureCollisionData empty()
     {
-        return new StructureCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), Map.of());
+        return new StructureCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), Map.of());
     }
 
     private static boolean isFullBlockCube(VoxelShape shape)
     {
-        List<Box> parts = shape.getBoundingBoxes();
+        List<AABB> parts = shape.toAabbs();
 
         if (parts.size() != 1)
         {
             return false;
         }
 
-        Box part = parts.get(0);
+        AABB part = parts.get(0);
 
         return part.minX <= 1.0E-4D && part.minY <= 1.0E-4D && part.minZ <= 1.0E-4D
             && part.maxX >= 1D - 1.0E-4D && part.maxY >= 1D - 1.0E-4D && part.maxZ >= 1D - 1.0E-4D;
@@ -387,9 +387,9 @@ public final class StructureCollisionData
     /**
      * Merge adjacent full cubes into large AABBs (greedy meshing in X then Z then Y).
      */
-    private static List<Box> greedyMergeFullCubes(Set<Long> fullCubes)
+    private static List<AABB> greedyMergeFullCubes(Set<Long> fullCubes)
     {
-        List<Box> merged = new ArrayList<>();
+        List<AABB> merged = new ArrayList<>();
         Set<Long> remaining = new HashSet<>(fullCubes);
 
         while (!remaining.isEmpty())
@@ -451,19 +451,19 @@ public final class StructureCollisionData
                 }
             }
 
-            merged.add(new Box(x0, y0, z0, x1 + 1, y1 + 1, z1 + 1));
+            merged.add(new AABB(x0, y0, z0, x1 + 1, y1 + 1, z1 + 1));
         }
 
         return merged;
     }
 
-    private static Map<Long, int[]> buildSpatialGrid(List<Box> boxes)
+    private static Map<Long, int[]> buildSpatialGrid(List<AABB> boxes)
     {
         Map<Long, List<Integer>> temp = new HashMap<>();
 
         for (int i = 0; i < boxes.size(); i++)
         {
-            Box box = boxes.get(i);
+            AABB box = boxes.get(i);
             int minCX = floorDiv(box.minX, CELL);
             int minCY = floorDiv(box.minY, CELL);
             int minCZ = floorDiv(box.minZ, CELL);
@@ -518,24 +518,24 @@ public final class StructureCollisionData
 
     private static int unpackX(long key)
     {
-        return BlockPos.unpackLongX(key);
+        return BlockPos.getX(key);
     }
 
     private static int unpackY(long key)
     {
-        return BlockPos.unpackLongY(key);
+        return BlockPos.getY(key);
     }
 
     private static int unpackZ(long key)
     {
-        return BlockPos.unpackLongZ(key);
+        return BlockPos.getZ(key);
     }
 
-    private static BlockState readBlockState(NbtCompound entry)
+    private static BlockState readBlockState(CompoundTag entry)
     {
         if (entry == null)
         {
-            return Blocks.AIR.getDefaultState();
+            return Blocks.AIR.defaultBlockState();
         }
 
         String name = entry.getString("Name").orElse("");
@@ -543,7 +543,7 @@ public final class StructureCollisionData
 
         try
         {
-            block = Registries.BLOCK.get(Identifier.of(name));
+            block = BuiltInRegistries.BLOCK.getValue(Identifier.parse(name));
 
             if (block == null)
             {
@@ -557,28 +557,28 @@ public final class StructureCollisionData
 
         if ("minecraft:jigsaw".equals(name) || block == Blocks.JIGSAW)
         {
-            return Blocks.AIR.getDefaultState();
+            return Blocks.AIR.defaultBlockState();
         }
 
-        BlockState state = block.getDefaultState();
+        BlockState state = block.defaultBlockState();
 
         if (entry.contains("Properties"))
         {
-            NbtCompound props = entry.getCompound("Properties").orElse(null);
+            CompoundTag props = entry.getCompound("Properties").orElse(null);
 
             if (props != null)
             {
-                for (String key : props.getKeys())
+                for (String key : props.keySet())
                 {
                     String value = props.getString(key).orElse("");
-                    Property<?> property = block.getStateManager().getProperty(key);
+                    Property<?> property = block.getStateDefinition().getProperty(key);
 
                     if (property == null)
                     {
                         continue;
                     }
 
-                    Optional<?> parsed = property.parse(value);
+                    Optional<?> parsed = property.getValue(value);
 
                     if (parsed.isPresent())
                     {
@@ -589,7 +589,7 @@ public final class StructureCollisionData
                             @SuppressWarnings("unchecked")
                             Comparable c = (Comparable) parsed.get();
 
-                            state = state.with(raw, c);
+                            state = state.setValue(raw, c);
                         }
                         catch (Exception ignored)
                         {}

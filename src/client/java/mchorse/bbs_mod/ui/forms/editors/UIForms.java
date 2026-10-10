@@ -1,5 +1,6 @@
 package mchorse.bbs_mod.ui.forms.editors;
 
+import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.BodyPartManager;
@@ -9,8 +10,9 @@ import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.input.list.UIList;
 import mchorse.bbs_mod.utils.StringUtils;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.Minecraft;
+
+import com.mojang.blaze3d.platform.Lighting;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -347,9 +349,9 @@ public class UIForms extends UIList<UIForms.FormEntry>
 
             y -= 10;
 
-            MinecraftClient.getInstance().gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
+            BBSRendering.setupLevelLighting();
             FormUtilsClient.renderUI(form, context, x, y, x + 40, y + 40);
-            MinecraftClient.getInstance().gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.LEVEL);
+            BBSRendering.setupItemsFlatLighting();
 
             context.batcher.unclip(context);
         }

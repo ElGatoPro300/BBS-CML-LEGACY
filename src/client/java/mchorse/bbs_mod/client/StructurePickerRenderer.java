@@ -7,18 +7,18 @@ import mchorse.bbs_mod.items.StructurePickerRegionMerger;
 import mchorse.bbs_mod.items.StructurePickerSelection;
 import mchorse.bbs_mod.ui.items.UIStructurePickerPanel;
 
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
@@ -42,7 +42,7 @@ public class StructurePickerRenderer
     private static final float EDGE_ALPHA = 0.95F;
     private static final float FILL_ALPHA = 0.42F;
 
-    public static void render(WorldRenderContext context)
+    public static void render(LevelRenderContext context)
     {
         if (!StructurePickerClient.isActive() && !UIStructurePickerPanel.isOpened())
         {
@@ -57,13 +57,14 @@ public class StructurePickerRenderer
             return;
         }
 
-        if (context.matrices() == null)
+        Minecraft mc = Minecraft.getInstance();
+
+        if (context.poseStack() == null)
         {
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Vec3d camera = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3 camera = mc.gameRenderer.getMainCamera().position();
 
         GlStateManager._enableBlend();
         GlStateManager._blendFuncSeparate(770, 771, 1, 0);
@@ -73,9 +74,9 @@ public class StructurePickerRenderer
         GlStateManager._depthMask(false);
         GlStateManager._depthFunc(GL11.GL_LEQUAL);
 
-        MatrixStack stack = context.matrices();
+        PoseStack stack = context.poseStack();
 
-        stack.push();
+        stack.pushPose();
         stack.translate(-camera.x, -camera.y, -camera.z);
 
         Set<BlockPos> blockPositions = new LinkedHashSet<>();
@@ -126,7 +127,7 @@ public class StructurePickerRenderer
             StructurePickerRenderer.renderResizeGizmo(stack, StructurePickerScaleGizmo.getFreeCorner());
         }
 
-        stack.pop();
+        stack.popPose();
 
         GlStateManager._depthFunc(GL11.GL_LEQUAL);
         GlStateManager._depthMask(true);
@@ -163,7 +164,7 @@ public class StructurePickerRenderer
         return new float[] {r, g, b};
     }
 
-    private static void renderCornerGizmos(MatrixStack stack, Vec3d camera)
+    private static void renderCornerGizmos(PoseStack stack, Vec3 camera)
     {
         /* BLOCK/SAME/BRUSH are paint-style; corner handles stay on AABB volume modes. */
         if (StructurePickerClient.getMode().isPaintMode() || StructurePickerClient.getMode().isEraseMode())
@@ -198,7 +199,7 @@ public class StructurePickerRenderer
         }
     }
 
-    private static void renderBrushPreview(MatrixStack stack)
+    private static void renderBrushPreview(PoseStack stack)
     {
         if (StructurePickerClient.getMode() != StructurePickerMode.BRUSH)
         {
@@ -231,7 +232,7 @@ public class StructurePickerRenderer
         }
     }
 
-    private static void renderRegionBox(MatrixStack stack, BlockPos first, BlockPos second, StructurePickerMode mode, Direction triangleFacing, float r, float g, float b)
+    private static void renderRegionBox(PoseStack stack, BlockPos first, BlockPos second, StructurePickerMode mode, Direction triangleFacing, float r, float g, float b)
     {
         BlockPos adjusted = StructurePickerSelection.adjustSecond(first, second, mode);
         BlockPos min = StructurePickerSelection.min(first, adjusted);
@@ -248,7 +249,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderExpandedVolume(stack, min.getX(), min.getY(), min.getZ(), sizeX, sizeY, sizeZ, r, g, b);
     }
 
-    private static void renderMergedBlockBox(MatrixStack stack, BlockPos min, BlockPos max, float r, float g, float b)
+    private static void renderMergedBlockBox(PoseStack stack, BlockPos min, BlockPos max, float r, float g, float b)
     {
         double sizeX = max.getX() - min.getX() + 1D;
         double sizeY = max.getY() - min.getY() + 1D;
@@ -257,7 +258,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderExpandedVolume(stack, min.getX(), min.getY(), min.getZ(), sizeX, sizeY, sizeZ, r, g, b);
     }
 
-    private static void renderExpandedVolume(MatrixStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b)
+    private static void renderExpandedVolume(PoseStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b)
     {
         double e = VOLUME_EXPAND;
 
@@ -266,32 +267,32 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderBoxEdges(stack, x - e, y - e, z - e, w + e * 2D, h + e * 2D, d + e * 2D, r, g, b, EDGE_ALPHA);
     }
 
-    private static void renderVolumeFill(MatrixStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b, float a)
+    private static void renderVolumeFill(PoseStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b, float a)
     {
         if (a <= 0.001F)
         {
             return;
         }
 
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
-        stack.push();
+        stack.pushPose();
         stack.translate(x, y, z);
         Draw.fillBox(builder, stack, 0F, 0F, 0F, (float) w, (float) h, (float) d, r, g, b, a);
-        stack.pop();
+        stack.popPose();
 
         Draw.flush(builder, Draw.getPositionColorLayer());
     }
 
-    private static void renderBoxEdges(MatrixStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b, float a)
+    private static void renderBoxEdges(PoseStack stack, double x, double y, double z, double w, double h, double d, float r, float g, float b, float a)
     {
         float fw = (float) w;
         float fh = (float) h;
         float fd = (float) d;
         float t = 1F / 96F + (float) (Math.sqrt(w * w + h * h + d * d) / 2000D);
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
-        stack.push();
+        stack.pushPose();
         stack.translate(x, y, z);
 
         Draw.fillBox(builder, stack, -t, -t, -t, t, t + fh, t, r, g, b, a);
@@ -302,18 +303,18 @@ public class StructurePickerRenderer
         Draw.fillBox(builder, stack, -t, -t + fh, -t, t + fw, t + fh, t, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t + fh, -t + fd, t + fw, t + fh, t + fd, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t + fh, -t, t, t + fh, t + fd, r, g, b, a);
-        Draw.fillBox(builder, stack, -t + fw, -t + fh, -t, t + fw, t + fh, t, r, g, b, a);
+        Draw.fillBox(builder, stack, -t + fw, -t + fh, -t, t + fw, t + fh, t + fd, r, g, b, a);
 
         Draw.fillBox(builder, stack, -t, -t, -t, t + fw, t, t, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t, -t + fd, t + fw, t, t + fd, r, g, b, a);
         Draw.fillBox(builder, stack, -t, -t, -t, t, t, t + fd, r, g, b, a);
         Draw.fillBox(builder, stack, -t + fw, -t, -t, t + fw, t, t + fd, r, g, b, a);
 
-        stack.pop();
+        stack.popPose();
         Draw.flush(builder, Draw.getPositionColorLayer());
     }
 
-    private static void renderSelectionCorners(MatrixStack stack, BlockPos first, BlockPos second, StructurePickerMode mode, Vec3d camera)
+    private static void renderSelectionCorners(PoseStack stack, BlockPos first, BlockPos second, StructurePickerMode mode, Vec3 camera)
     {
         BlockPos adjusted = StructurePickerSelection.adjustSecond(first, second, mode);
         BlockPos min = StructurePickerSelection.min(first, adjusted);
@@ -337,7 +338,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderCornerHandle(stack, max.getX() + 1, max.getY() + 1, max.getZ() + 1, hMax, pulse);
     }
 
-    private static void renderCornerHandle(MatrixStack stack, double x, double y, double z, float h, float alpha)
+    private static void renderCornerHandle(PoseStack stack, double x, double y, double z, float h, float alpha)
     {
         float rim = h * 1.18F;
 
@@ -345,7 +346,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderVolumeFill(stack, x - h * 0.5D, y - h * 0.5D, z - h * 0.5D, h, h, h, 1F, 1F, 1F, alpha);
     }
 
-    private static void renderResizeGizmo(MatrixStack stack, BlockPos freeCorner)
+    private static void renderResizeGizmo(PoseStack stack, BlockPos freeCorner)
     {
         if (freeCorner == null)
         {
@@ -377,7 +378,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderScaleAxis(stack, ox, oy, oz, StructurePickerAxis.Z, len, t, knob, 0.25F, 0.5F, 1F, hover == StructurePickerAxis.Z);
     }
 
-    private static void renderScaleAxis(MatrixStack stack, double ox, double oy, double oz, StructurePickerAxis axis, float len, float t, float knob, float r, float g, float b, boolean highlight)
+    private static void renderScaleAxis(PoseStack stack, double ox, double oy, double oz, StructurePickerAxis axis, float len, float t, float knob, float r, float g, float b, boolean highlight)
     {
         StructurePickerRenderer.renderAxisArm(stack, ox, oy, oz, axis, len, t, r, g, b, highlight);
 
@@ -406,7 +407,7 @@ public class StructurePickerRenderer
         StructurePickerRenderer.renderVolumeFill(stack, ex - s * 0.5D, ey - s * 0.5D, ez - s * 0.5D, s, s, s, r, g, b, a);
     }
 
-    private static void renderAxisArm(MatrixStack stack, double ox, double oy, double oz, StructurePickerAxis axis, float len, float t, float r, float g, float b, boolean highlight)
+    private static void renderAxisArm(PoseStack stack, double ox, double oy, double oz, StructurePickerAxis axis, float len, float t, float r, float g, float b, boolean highlight)
     {
         float thick = t * (highlight ? 1.45F : 1F);
         float a = highlight ? 1F : 0.92F;
@@ -434,7 +435,7 @@ public class StructurePickerRenderer
         }
     }
 
-    private static float handleScale(Vec3d camera, double x, double y, double z)
+    private static float handleScale(Vec3 camera, double x, double y, double z)
     {
         double dx = camera.x - x;
         double dy = camera.y - y;

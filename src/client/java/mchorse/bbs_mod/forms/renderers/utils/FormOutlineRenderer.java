@@ -14,19 +14,19 @@ import mchorse.bbs_mod.utils.MatrixStackUtils;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.pose.Pose;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.util.Mth;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
@@ -74,7 +74,7 @@ public class FormOutlineRenderer
     /**
      * Draws a single outer-silhouette outline around the given model and its attached body parts.
      */
-    public static void render(MatrixStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness)
+    public static void render(PoseStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness)
     {
         render(stack, model, shapeKeys, textureResolver, light, outlineColor, thickness, Collections.emptyList());
     }
@@ -82,7 +82,7 @@ public class FormOutlineRenderer
     /**
      * Draws a single outer-silhouette outline around the given model and its attached body parts.
      */
-    public static void render(MatrixStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness, List<BodyPartData> bodyParts)
+    public static void render(PoseStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness, List<BodyPartData> bodyParts)
     {
         render(stack, model, shapeKeys, textureResolver, light, outlineColor, thickness, false, 1F, 1F, bodyParts);
     }
@@ -90,7 +90,7 @@ public class FormOutlineRenderer
     /**
      * Draws a single outer-silhouette outline around the given model and its attached body parts, with optional animated rainbow gradient.
      */
-    public static void render(MatrixStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness, boolean rainbow, float rainbowSpeed, float rainbowScale, List<BodyPartData> bodyParts)
+    public static void render(PoseStack stack, ModelInstance model, ShapeKeys shapeKeys, Function<String, Link> textureResolver, int light, Color outlineColor, float thickness, boolean rainbow, float rainbowSpeed, float rainbowScale, List<BodyPartData> bodyParts)
     {
         if (model == null)
         {
@@ -105,16 +105,16 @@ public class FormOutlineRenderer
      * Silhouette outline with a custom mask pass (e.g. MobForm entity re-draw into the mask FB).
      * Same dilate/composite pipeline as the ModelInstance path.
      */
-    public static void render(MatrixStack stack, Color outlineColor, float thickness, boolean rainbow, float rainbowSpeed, float rainbowScale, Runnable maskDraw)
+    public static void render(PoseStack stack, Color outlineColor, float thickness, boolean rainbow, float rainbowSpeed, float rainbowScale, Runnable maskDraw)
     {
         if (rendering || maskDraw == null || thickness <= 0F || outlineColor == null || outlineColor.a <= 0.001F)
         {
             return;
         }
 
-        ShaderProgram maskShader = BBSShaders.getOutlineMask();
-        ShaderProgram dilateShader = BBSShaders.getOutlineDilateH();
-        ShaderProgram compositeShader = BBSShaders.getOutlineComposite();
+        GlProgram maskShader = BBSShaders.getOutlineMask();
+        GlProgram dilateShader = BBSShaders.getOutlineDilateH();
+        GlProgram compositeShader = BBSShaders.getOutlineComposite();
 
         if (maskShader == null || dilateShader == null || compositeShader == null)
         {
@@ -128,22 +128,22 @@ public class FormOutlineRenderer
             return;
         }
 
-        Vector3f translation = stack.peek().getPositionMatrix().getTranslation(new Vector3f());
+        Vector3f translation = stack.last().pose().getTranslation(new Vector3f());
         float distance = translation.length();
         float distanceScale = distance > 0.0001F
-            ? MathHelper.clamp(REFERENCE_DISTANCE / distance, MIN_DISTANCE_SCALE, MAX_DISTANCE_SCALE)
+            ? Mth.clamp(REFERENCE_DISTANCE / distance, MIN_DISTANCE_SCALE, MAX_DISTANCE_SCALE)
             : MAX_DISTANCE_SCALE;
 
-        thickness = MathHelper.clamp(thickness * distanceScale, 0F, MAX_THICKNESS);
+        thickness = Mth.clamp(thickness * distanceScale, 0F, MAX_THICKNESS);
 
         if (thickness <= 0F)
         {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        int width = Math.max(2, client.getWindow().getFramebufferWidth());
-        int height = Math.max(2, client.getWindow().getFramebufferHeight());
+        Minecraft client = Minecraft.getInstance();
+        int width = Math.max(2, client.getMainRenderTarget().width);
+        int height = Math.max(2, client.getMainRenderTarget().height);
 
         framebuffers.updateForScreenSize(width, height);
 
@@ -316,7 +316,7 @@ public class FormOutlineRenderer
     }
 
     private static void renderMaskGeometry(
-        MatrixStack stack,
+        PoseStack stack,
         ModelInstance model,
         ShapeKeys shapeKeys,
         Function<String, Link> textureResolver,
@@ -325,7 +325,7 @@ public class FormOutlineRenderer
     {
         if (model != null)
         {
-            model.render(stack, BBSShaders::getOutlineMask, Color.white(), light, OverlayTexture.DEFAULT_UV, (StencilMap) null, shapeKeys, textureResolver);
+            model.render(stack, BBSShaders::getOutlineMask, Color.white(), light, OverlayTexture.NO_OVERLAY, (StencilMap) null, shapeKeys, textureResolver);
         }
 
         if (bodyParts != null && !bodyParts.isEmpty())
@@ -343,11 +343,11 @@ public class FormOutlineRenderer
                     part.model.model.applyPose(part.pose);
                 }
 
-                MatrixStack partStack = new MatrixStack();
+                PoseStack partStack = new PoseStack();
 
-                MatrixStackUtils.multiply(partStack, stack.peek().getPositionMatrix());
+                MatrixStackUtils.multiply(partStack, stack.last().pose());
                 MatrixStackUtils.multiply(partStack, part.relativeTransform);
-                partStack.peek().getNormalMatrix().set(stack.peek().getNormalMatrix());
+                partStack.last().normal().set(stack.last().normal());
 
                 renderMaskGeometry(partStack, part.model, part.shapeKeys, part.textureResolver, light, part.children);
             }
@@ -356,14 +356,14 @@ public class FormOutlineRenderer
 
     private static void drawFullscreenQuad(float z)
     {
-        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
 
         /* Fullscreen quad in NDC space. */
-        builder.vertex(-1F, -1F, z).texture(0F, 0F);
-        builder.vertex(1F, -1F, z).texture(1F, 0F);
-        builder.vertex(1F, 1F, z).texture(1F, 1F);
-        builder.vertex(-1F, 1F, z).texture(0F, 1F);
+        builder.addVertex(-1F, -1F, z).setUv(0F, 0F);
+        builder.addVertex(1F, -1F, z).setUv(1F, 0F);
+        builder.addVertex(1F, 1F, z).setUv(1F, 1F);
+        builder.addVertex(-1F, 1F, z).setUv(0F, 1F);
 
-        BufferRenderer.drawWithGlobalProgram(builder.end());
+        BufferRenderer.drawWithGlobalProgram(builder.buildOrThrow());
     }
 }

@@ -285,7 +285,7 @@ public class UIWelcomeOverlayPanel extends UIElement
                 float cardAlpha = reveal;
                 float dy = (1.0F - reveal) * 16.0F;
 
-                Matrix3x2fStack matrices = context.batcher.getContext().getMatrices();
+                Matrix3x2fStack matrices = context.batcher.getContext().pose();
                 matrices.pushMatrix();
                 matrices.translate(0F, dy);
 
@@ -324,7 +324,7 @@ public class UIWelcomeOverlayPanel extends UIElement
                 float cx = this.slideContainer.area.mx();
                 float cy = this.slideContainer.area.my();
 
-                Matrix3x2fStack matrices = context.batcher.getContext().getMatrices();
+                Matrix3x2fStack matrices = context.batcher.getContext().pose();
                 matrices.pushMatrix();
                 matrices.translate(cx, cy);
                 matrices.scale(scale, scale);

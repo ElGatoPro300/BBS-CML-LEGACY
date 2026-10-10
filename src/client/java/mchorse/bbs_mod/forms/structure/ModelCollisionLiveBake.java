@@ -12,7 +12,7 @@ import mchorse.bbs_mod.forms.renderers.FormRenderer;
 import mchorse.bbs_mod.forms.renderers.ModelFormRenderer;
 import mchorse.bbs_mod.utils.pose.Pose;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import org.joml.Vector3f;
 
@@ -39,10 +39,10 @@ public final class ModelCollisionLiveBake
             return null;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
 
         /* Only bake on the client render/logic thread; integrated server keeps using static pose bake. */
-        if (client == null || !client.isOnThread())
+        if (client == null || !client.isSameThread())
         {
             return null;
         }

@@ -8,9 +8,10 @@ import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.MatrixStackUtils;
 import mchorse.bbs_mod.utils.colors.Color;
 
-import net.minecraft.client.util.math.MatrixStack;
-
 import org.joml.Matrix4f;
+
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 import java.util.function.Consumer;
 
@@ -75,7 +76,7 @@ public final class FormOutlinePass
      * mask geometry (camera-baked when Iris-deferred). Uses {@code context.stack} as the
      * transform source.
      */
-    public static void run(Form form, FormRenderingContext context, float formAlpha, Consumer<MatrixStack> maskDraw)
+    public static void run(Form form, FormRenderingContext context, float formAlpha, Consumer<PoseStack> maskDraw)
     {
         run(form, context, formAlpha, context != null ? context.stack : null, maskDraw);
     }
@@ -84,7 +85,7 @@ public final class FormOutlinePass
      * Same as {@link #run(Form, FormRenderingContext, float, Consumer)} but takes an explicit
      * source stack (e.g. Billboard after in-place camera facing).
      */
-    public static void run(Form form, FormRenderingContext context, float formAlpha, MatrixStack sourceStack, Consumer<MatrixStack> maskDraw)
+    public static void run(Form form, FormRenderingContext context, float formAlpha, PoseStack sourceStack, Consumer<PoseStack> maskDraw)
     {
         if (shouldSkip(form, context, formAlpha) || maskDraw == null || sourceStack == null)
         {
@@ -99,11 +100,11 @@ public final class FormOutlinePass
 
         if (BBSRendering.isIrisDeferredModelPass())
         {
-            Matrix4f baked = ModelVAORenderer.capturePaintOverlayRootMatrix(new Matrix4f(sourceStack.peek().getPositionMatrix()));
-            MatrixStack deferredStack = new MatrixStack();
+            Matrix4f baked = ModelVAORenderer.capturePaintOverlayRootMatrix(new Matrix4f(sourceStack.last().pose()));
+            PoseStack deferredStack = new PoseStack();
 
             MatrixStackUtils.multiply(deferredStack, baked);
-            deferredStack.peek().getNormalMatrix().set(sourceStack.peek().getNormalMatrix());
+            deferredStack.last().normal().set(sourceStack.last().normal());
 
             Color colorSnapshot = outlineColor.copy();
             float thicknessSnapshot = thickness;
@@ -118,10 +119,10 @@ public final class FormOutlinePass
         }
         else
         {
-            MatrixStack maskStack = new MatrixStack();
+            PoseStack maskStack = new PoseStack();
 
-            MatrixStackUtils.multiply(maskStack, sourceStack.peek().getPositionMatrix());
-            maskStack.peek().getNormalMatrix().set(sourceStack.peek().getNormalMatrix());
+            MatrixStackUtils.multiply(maskStack, sourceStack.last().pose());
+            maskStack.last().normal().set(sourceStack.last().normal());
 
             FormOutlineRenderer.render(maskStack, outlineColor, thickness, rainbow, rainbowSpeed, rainbowScale,
                 () -> maskDraw.accept(maskStack));

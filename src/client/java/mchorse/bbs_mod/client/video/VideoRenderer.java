@@ -9,7 +9,7 @@ import mchorse.bbs_mod.utils.clips.Clip;
 
 import net.fabricmc.loader.api.FabricLoader;
 
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 import java.io.File;
 import java.util.List;
@@ -155,7 +155,7 @@ public class VideoRenderer
         return file != null && file.exists() ? file : null;
     }
 
-    public static void renderClip(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area area, UIContext context)
+    public static void renderClip(PoseStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area area, UIContext context)
     {
         if (!isModPresent())
         {
@@ -165,7 +165,7 @@ public class VideoRenderer
         WaterMediaVideoRenderer.renderClip(stack, batcher, video, tick, isRunning, area, context);
     }
 
-    public static void renderClips(MatrixStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
+    public static void renderClips(PoseStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
     {
         if (!isModPresent())
         {
@@ -175,7 +175,7 @@ public class VideoRenderer
         WaterMediaVideoRenderer.renderClips(stack, batcher, clips, tick, isRunning, viewport, globalArea, context, screenWidth, screenHeight, renderGlobal);
     }
 
-    public static void renderOverlay(MatrixStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
+    public static void renderOverlay(PoseStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
     {
         if (!isModPresent())
         {
@@ -185,7 +185,7 @@ public class VideoRenderer
         WaterMediaVideoRenderer.renderOverlay(stack, batcher, overlay, isRunning, viewport, screenWidth, screenHeight);
     }
 
-    public static void render(MatrixStack stack, Batcher2D batcher, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
+    public static void render(PoseStack stack, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
     {
         if (!isModPresent())
         {

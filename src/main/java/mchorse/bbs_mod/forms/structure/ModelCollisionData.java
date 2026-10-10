@@ -24,7 +24,7 @@ import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.PoseTransform;
 import mchorse.bbs_mod.utils.pose.Transform;
 
-import net.minecraft.util.math.Box;
+import net.minecraft.world.phys.AABB;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -71,8 +71,8 @@ public final class ModelCollisionData
     private static final MolangParser PARSER = new MolangParser();
     private static volatile LivePoseBaker liveBaker;
 
-    public final List<Box> localBoxes;
-    public final Box localBounds;
+    public final List<AABB> localBoxes;
+    public final AABB localBounds;
     public final Vector3f modelScale;
     /**
      * Skinned BOBJ vertices in model-local space (xyz interleaved). World-space XZ columns are
@@ -80,12 +80,12 @@ public final class ModelCollisionData
      */
     public final float[] skinnedVertices;
 
-    private ModelCollisionData(List<Box> localBoxes, Box localBounds, Vector3f modelScale)
+    private ModelCollisionData(List<AABB> localBoxes, AABB localBounds, Vector3f modelScale)
     {
         this(localBoxes, localBounds, modelScale, null);
     }
 
-    private ModelCollisionData(List<Box> localBoxes, Box localBounds, Vector3f modelScale, float[] skinnedVertices)
+    private ModelCollisionData(List<AABB> localBoxes, AABB localBounds, Vector3f modelScale, float[] skinnedVertices)
     {
         this.localBoxes = List.copyOf(localBoxes);
         this.localBounds = localBounds;
@@ -145,10 +145,10 @@ public final class ModelCollisionData
     {
         if (model == null)
         {
-            return new ModelCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), modelScale != null ? modelScale : new Vector3f(1F));
+            return new ModelCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), modelScale != null ? modelScale : new Vector3f(1F));
         }
 
-        List<Box> boxes = new ArrayList<>();
+        List<AABB> boxes = new ArrayList<>();
 
         collectCubicBoxes(model, boxes);
 
@@ -165,21 +165,21 @@ public final class ModelCollisionData
 
         if (mesh == null || armature == null || armature.matrices == null)
         {
-            return new ModelCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), scale);
+            return new ModelCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), scale);
         }
 
         float[] vertices = skinBobjVertices(mesh, armature);
 
         if (vertices == null || vertices.length < 3)
         {
-            return new ModelCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), scale);
+            return new ModelCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), scale);
         }
 
-        Box localBounds = aabbFromPosData(vertices);
+        AABB localBounds = aabbFromPosData(vertices);
 
         if (localBounds == null)
         {
-            localBounds = new Box(0, 0, 0, 0, 0, 0);
+            localBounds = new AABB(0, 0, 0, 0, 0, 0);
         }
 
         return new ModelCollisionData(List.of(), localBounds, scale, vertices);
@@ -198,7 +198,7 @@ public final class ModelCollisionData
 
         if (cached == null || cached.empty)
         {
-            return new ModelCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), new Vector3f(1F));
+            return new ModelCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), new Vector3f(1F));
         }
 
         /* Match FormRenderer: state tracks temporarily merge into pose/transform. */
@@ -216,7 +216,7 @@ public final class ModelCollisionData
                 return posed.data;
             }
 
-            List<Box> boxes = new ArrayList<>();
+            List<AABB> boxes = new ArrayList<>();
 
             if (cached.model != null)
             {
@@ -258,18 +258,18 @@ public final class ModelCollisionData
         }
     }
 
-    private static ModelCollisionData finishBoxes(List<Box> boxes, Vector3f modelScale, double surfaceSnug)
+    private static ModelCollisionData finishBoxes(List<AABB> boxes, Vector3f modelScale, double surfaceSnug)
     {
         if (boxes.isEmpty())
         {
-            return new ModelCollisionData(List.of(), new Box(0, 0, 0, 0, 0, 0), modelScale);
+            return new ModelCollisionData(List.of(), new AABB(0, 0, 0, 0, 0, 0), modelScale);
         }
 
-        List<Box> snug = new ArrayList<>(boxes.size());
+        List<AABB> snug = new ArrayList<>(boxes.size());
 
-        for (Box box : boxes)
+        for (AABB box : boxes)
         {
-            Box fitted = snugTop(box, surfaceSnug);
+            AABB fitted = snugTop(box, surfaceSnug);
 
             if (fitted != null)
             {
@@ -296,7 +296,7 @@ public final class ModelCollisionData
      * Lower only the top of the box so the player rests on the visible surface instead of
      * floating on an inflated AABB. Sides/bottom stay put for solid contact.
      */
-    private static Box snugTop(Box box, double surfaceSnug)
+    private static AABB snugTop(AABB box, double surfaceSnug)
     {
         if (box == null)
         {
@@ -312,7 +312,7 @@ public final class ModelCollisionData
 
         double pull = Math.min(surfaceSnug, height * 0.35D);
 
-        return new Box(box.minX, box.minY, box.minZ, box.maxX, box.maxY - pull, box.maxZ);
+        return new AABB(box.minX, box.minY, box.minZ, box.maxX, box.maxY - pull, box.maxZ);
     }
 
     public static void invalidate(String modelId)
@@ -441,11 +441,11 @@ public final class ModelCollisionData
             return new CachedModel(null, null, null, List.of(), scale, parts, true);
         }
 
-        List<Box> fallback = new ArrayList<>();
+        List<AABB> fallback = new ArrayList<>();
 
         if (source.mesh != null)
         {
-            Box box = aabbFromPosData(source.mesh.posData);
+            AABB box = aabbFromPosData(source.mesh.posData);
 
             if (box != null)
             {
@@ -785,7 +785,7 @@ public final class ModelCollisionData
      * Build world-space walkable slabs from model-local skinned vertices.
      * Projection uses world up so horizontal / sideways form rotations stay standable.
      */
-    public static List<Box> buildWorldSpaceBobjSlabs(float[] localVertices, Matrix4f worldMatrix)
+    public static List<AABB> buildWorldSpaceBobjSlabs(float[] localVertices, Matrix4f worldMatrix)
     {
         if (localVertices == null || localVertices.length < 3 || worldMatrix == null)
         {
@@ -818,7 +818,7 @@ public final class ModelCollisionData
             stampBobjColumn(columns, gx, gz + 1, point.y);
         }
 
-        List<Box> boxes = new ArrayList<>(columns.size());
+        List<AABB> boxes = new ArrayList<>(columns.size());
 
         for (Map.Entry<Long, float[]> entry : columns.entrySet())
         {
@@ -832,7 +832,7 @@ public final class ModelCollisionData
             float top = entry.getValue()[1] - (float) SURFACE_SNUG_BOBJ;
             float bottom = top - BOBJ_SLAB_THICKNESS;
 
-            boxes.add(new Box(minX, bottom, minZ, maxX, top, maxZ));
+            boxes.add(new AABB(minX, bottom, minZ, maxX, top, maxZ));
         }
 
         if (boxes.size() > MAX_BOXES_BOBJ)
@@ -863,7 +863,7 @@ public final class ModelCollisionData
         return ((long) gx & 0xFFFFFFFFL) | (((long) gz & 0xFFFFFFFFL) << 32);
     }
 
-    private static Box aabbFromPosData(float[] posData)
+    private static AABB aabbFromPosData(float[] posData)
     {
         if (posData == null || posData.length < 3)
         {
@@ -896,10 +896,10 @@ public final class ModelCollisionData
             return null;
         }
 
-        return new Box(minX, minY, minZ, maxX, maxY, maxZ);
+        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    private static void collectCubicBoxes(Model model, List<Box> boxes)
+    private static void collectCubicBoxes(Model model, List<AABB> boxes)
     {
         Matrix4f matrix = new Matrix4f();
 
@@ -909,7 +909,7 @@ public final class ModelCollisionData
         }
     }
 
-    private static void walkGroup(ModelGroup group, Matrix4f parent, List<Box> boxes)
+    private static void walkGroup(ModelGroup group, Matrix4f parent, List<AABB> boxes)
     {
         if (group == null || !group.visible)
         {
@@ -927,7 +927,7 @@ public final class ModelCollisionData
 
         for (ModelMesh mesh : group.meshes)
         {
-            Box box = meshBox(mesh, local);
+            AABB box = meshBox(mesh, local);
 
             if (box != null)
             {
@@ -981,7 +981,7 @@ public final class ModelCollisionData
      * (a single transformed AABB floats/sinks differently per orientation).
      * Texture inflate is ignored — it only pads the draw and made players hover above the mesh.
      */
-    private static void appendCubeBoxes(ModelCube cube, Matrix4f groupMatrix, List<Box> boxes)
+    private static void appendCubeBoxes(ModelCube cube, Matrix4f groupMatrix, List<AABB> boxes)
     {
         float minX = cube.origin.x / 16F;
         float minY = cube.origin.y / 16F;
@@ -1042,7 +1042,7 @@ public final class ModelCollisionData
         return Math.min(CUBE_CELL_MAX, Math.max(1, (int) Math.ceil(size / CUBE_CELL)));
     }
 
-    private static Box meshBox(ModelMesh mesh, Matrix4f groupMatrix)
+    private static AABB meshBox(ModelMesh mesh, Matrix4f groupMatrix)
     {
         if (mesh.baseData == null || mesh.baseData.vertices == null || mesh.baseData.vertices.isEmpty())
         {
@@ -1079,7 +1079,7 @@ public final class ModelCollisionData
             return null;
         }
 
-        return new Box(minX, minY, minZ, maxX, maxY, maxZ);
+        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     private static void applyEulerZYX(Matrix4f matrix, Vector3f rotation)
@@ -1094,7 +1094,7 @@ public final class ModelCollisionData
         if (rotation.x != 0F) matrix.rotateX(MathUtils.toRad(rotation.x));
     }
 
-    private static Box transformAabb(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, Matrix4f matrix)
+    private static AABB transformAabb(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, Matrix4f matrix)
     {
         Vector4f c000 = new Vector4f(minX, minY, minZ, 1F).mul(matrix);
         Vector4f c001 = new Vector4f(minX, minY, maxZ, 1F).mul(matrix);
@@ -1111,7 +1111,7 @@ public final class ModelCollisionData
         float outMaxY = max8(c000.y, c001.y, c010.y, c011.y, c100.y, c101.y, c110.y, c111.y);
         float outMaxZ = max8(c000.z, c001.z, c010.z, c011.z, c100.z, c101.z, c110.z, c111.z);
 
-        return new Box(outMinX, outMinY, outMinZ, outMaxX, outMaxY, outMaxZ);
+        return new AABB(outMinX, outMinY, outMinZ, outMaxX, outMaxY, outMaxZ);
     }
 
     private static float min8(float a, float b, float c, float d, float e, float f, float g, float h)
@@ -1124,7 +1124,7 @@ public final class ModelCollisionData
         return Math.max(a, Math.max(b, Math.max(c, Math.max(d, Math.max(e, Math.max(f, Math.max(g, h)))))));
     }
 
-    private static Box unionBounds(List<Box> boxes)
+    private static AABB unionBounds(List<AABB> boxes)
     {
         double minX = Double.POSITIVE_INFINITY;
         double minY = Double.POSITIVE_INFINITY;
@@ -1133,7 +1133,7 @@ public final class ModelCollisionData
         double maxY = Double.NEGATIVE_INFINITY;
         double maxZ = Double.NEGATIVE_INFINITY;
 
-        for (Box box : boxes)
+        for (AABB box : boxes)
         {
             minX = Math.min(minX, box.minX);
             minY = Math.min(minY, box.minY);
@@ -1143,17 +1143,17 @@ public final class ModelCollisionData
             maxZ = Math.max(maxZ, box.maxZ);
         }
 
-        return new Box(minX, minY, minZ, maxX, maxY, maxZ);
+        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    private static List<Box> thinBoxes(List<Box> boxes, int max)
+    private static List<AABB> thinBoxes(List<AABB> boxes, int max)
     {
         if (boxes.size() <= max)
         {
             return boxes;
         }
 
-        List<Box> thinned = new ArrayList<>(max);
+        List<AABB> thinned = new ArrayList<>(max);
         double step = (double) boxes.size() / (double) max;
 
         for (int i = 0; i < max; i++)
@@ -1169,12 +1169,12 @@ public final class ModelCollisionData
         private final Model model;
         private final BOBJArmature bobjArmature;
         private final BOBJLoader.CompiledData bobjMesh;
-        private final List<Box> bobjBoxes;
+        private final List<AABB> bobjBoxes;
         private final Vector3f modelScale;
         private final Pose parts;
         private final boolean empty;
 
-        private CachedModel(Model model, BOBJArmature bobjArmature, BOBJLoader.CompiledData bobjMesh, List<Box> bobjBoxes, Vector3f modelScale, Pose parts, boolean empty)
+        private CachedModel(Model model, BOBJArmature bobjArmature, BOBJLoader.CompiledData bobjMesh, List<AABB> bobjBoxes, Vector3f modelScale, Pose parts, boolean empty)
         {
             this.model = model;
             this.bobjArmature = bobjArmature;

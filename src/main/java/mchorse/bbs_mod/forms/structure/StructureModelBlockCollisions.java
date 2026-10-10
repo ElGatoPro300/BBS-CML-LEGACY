@@ -2,11 +2,11 @@ package mchorse.bbs_mod.forms.structure;
 
 import mchorse.bbs_mod.blocks.entities.ModelBlockEntity;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.List;
 
@@ -34,7 +34,7 @@ public final class StructureModelBlockCollisions
         return ModelBlockSolidCollisions.hasSolidFormHitbox(entity);
     }
 
-    public static void appendShapes(Entity entity, Box swept, World world, List<VoxelShape> collisions)
+    public static void appendShapes(Entity entity, AABB swept, Level world, List<VoxelShape> collisions)
     {
         ModelBlockSolidCollisions.appendShapes(entity, swept, world, collisions);
     }
@@ -44,7 +44,7 @@ public final class StructureModelBlockCollisions
         return ModelBlockSolidCollisions.wrapMutable(collisions);
     }
 
-    public static Box sweptBox(Entity entity, Vec3d movement)
+    public static AABB sweptBox(Entity entity, Vec3 movement)
     {
         return ModelBlockSolidCollisions.sweptBox(entity, movement);
     }

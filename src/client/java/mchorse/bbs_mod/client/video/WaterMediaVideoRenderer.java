@@ -3,18 +3,21 @@ package mchorse.bbs_mod.client.video;
 import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.misc.VideoOverlay;
 import mchorse.bbs_mod.client.BBSRendering;
-import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.utils.clips.Clip;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
+import mchorse.bbs_mod.mixin.client.MinecraftClientInvoker;
+
+import net.minecraft.client.Minecraft;
 
 import org.joml.Matrix4f;
 
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
@@ -70,7 +73,7 @@ public class WaterMediaVideoRenderer
         }
     }
 
-    public static void renderClip(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area area, UIContext context)
+    public static void renderClip(PoseStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area area, UIContext context)
     {
         if (!video.enabled.get() || !video.isInside(tick))
         {
@@ -97,7 +100,7 @@ public class WaterMediaVideoRenderer
      * Legacy direct path kept for callers that still pass clip lists. Prefer
      * {@link #renderOverlay} via {@code ScreenEffectRenderer} so layer order is respected.
      */
-    public static void renderClips(MatrixStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
+    public static void renderClips(PoseStack stack, Batcher2D batcher, List<Clip> clips, int tick, boolean isRunning, Area viewport, Area globalArea, UIContext context, int screenWidth, int screenHeight, boolean renderGlobal)
     {
         for (Clip clip : clips)
         {
@@ -126,7 +129,7 @@ public class WaterMediaVideoRenderer
      * After the film world pass, {@code renderingWorld} is false so WindowMixin no longer
      * spoofs size — on a portrait export FBO that wrongly crops the top of the video.
      */
-    public static void renderOverlay(MatrixStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
+    public static void renderOverlay(PoseStack stack, Batcher2D batcher, VideoOverlay overlay, boolean isRunning, Area viewport, int screenWidth, int screenHeight)
     {
         if (overlay == null || overlay.path == null || overlay.path.isEmpty() || viewport == null)
         {
@@ -183,7 +186,7 @@ public class WaterMediaVideoRenderer
         BBSRendering.enableScissor(glX, glY, glW, glH);
     }
 
-    private static void renderVideoInArea(MatrixStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
+    private static void renderVideoInArea(PoseStack stack, Batcher2D batcher, VideoClip video, int tick, boolean isRunning, Area baseArea, Area viewport, UIContext context, int screenWidth, int screenHeight, boolean global)
     {
         int[] rect = layoutVideoRect(baseArea.x, baseArea.y, baseArea.w, baseArea.h,
             video.width.get(), video.height.get(), video.x.get(), video.y.get(),
@@ -326,7 +329,7 @@ public class WaterMediaVideoRenderer
         return file.exists() ? file : null;
     }
 
-    public static void render(MatrixStack stack, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
+    public static void render(PoseStack stack, String path, long position, boolean playing, int volume, int x, int y, int w, int h, float opacity, int cropX, int cropY, int cropWidth, int cropHeight, boolean loops)
     {
         FrameInfo frame = prepareFrame(path, position, playing, loops, volume);
 
@@ -386,19 +389,19 @@ public class WaterMediaVideoRenderer
         BBSRendering.depthMask(false);
         BBSRendering.disableCull();
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-        Matrix4f matrix = stack.peek().getPositionMatrix();
+        Tesselator tessellator = Tesselator.getInstance();
+        BufferBuilder buffer = tessellator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        Matrix4f matrix = stack.last().pose();
 
         /* Desplazar por recorte de izquierda/arriba para mantener el contenido en su lugar. */
         int drawX = x + Math.round(absW * left) * wSign;
         int drawY = y + Math.round(absH * top) * hSign;
 
-        buffer.vertex(matrix, drawX, drawY + drawH, 0).texture(u0, v1);
-        buffer.vertex(matrix, drawX + drawW, drawY + drawH, 0).texture(u1, v1);
-        buffer.vertex(matrix, drawX + drawW, drawY, 0).texture(u1, v0);
-        buffer.vertex(matrix, drawX, drawY, 0).texture(u0, v0);
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
+        buffer.addVertex(matrix, drawX, drawY + drawH, 0).setUv(u0, v1);
+        buffer.addVertex(matrix, drawX + drawW, drawY + drawH, 0).setUv(u1, v1);
+        buffer.addVertex(matrix, drawX + drawW, drawY, 0).setUv(u1, v0);
+        buffer.addVertex(matrix, drawX, drawY, 0).setUv(u0, v0);
+        mchorse.bbs_mod.client.render.BufferRenderer.drawWithGlobalProgram(buffer.buildOrThrow());
 
         BBSRendering.enableCull();
         BBSRendering.depthMask(true);
@@ -641,10 +644,10 @@ public class WaterMediaVideoRenderer
                     mrl.await(50L);
                 }
 
-                MinecraftClient client = MinecraftClient.getInstance();
+                Minecraft client = Minecraft.getInstance();
                 player = MediaAPI.createPlayer(
                     mrl,
-                    () -> MediaAPI.glEngine(client.getThread(), client),
+                    () -> MediaAPI.glEngine(((MinecraftClientInvoker) client).bbs$getRunningThread(), client),
                     () -> volume > 0 ? MediaAPI.alEngine() : null
                 );
 
@@ -963,10 +966,10 @@ public class WaterMediaVideoRenderer
                 mrl.await(100L);
             }
 
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             MediaPlayer player = MediaAPI.createPlayer(
                 mrl,
-                () -> MediaAPI.glEngine(client.getThread(), client),
+                () -> MediaAPI.glEngine(((MinecraftClientInvoker) client).bbs$getRunningThread(), client),
                 () -> null
             );
 

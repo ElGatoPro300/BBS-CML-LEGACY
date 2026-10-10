@@ -10,13 +10,13 @@ import mchorse.bbs_mod.settings.values.core.ValueTransform;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.pose.Transform;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -45,7 +45,7 @@ public final class ModelBlockSolidCollisions
 
     public static void updateRegistration(ModelBlockEntity entity)
     {
-        if (entity == null || entity.isRemoved() || entity.getWorld() == null)
+        if (entity == null || entity.isRemoved() || entity.getLevel() == null)
         {
             unregister(entity);
 
@@ -149,7 +149,7 @@ public final class ModelBlockSolidCollisions
         return hasSolidFormHitbox(entity);
     }
 
-    public static void appendShapes(Entity entity, Box swept, World world, List<VoxelShape> collisions)
+    public static void appendShapes(Entity entity, AABB swept, Level world, List<VoxelShape> collisions)
     {
         if (entity == null || world == null || collisions == null)
         {
@@ -163,11 +163,11 @@ public final class ModelBlockSolidCollisions
             return;
         }
 
-        Box query = swept.expand(0.25D);
+        AABB query = swept.inflate(0.25D);
 
         for (ModelBlockEntity model : active)
         {
-            if (model.isRemoved() || model.getWorld() != world)
+            if (model.isRemoved() || model.getLevel() != world)
             {
                 continue;
             }
@@ -185,7 +185,7 @@ public final class ModelBlockSolidCollisions
         }
     }
 
-    private static void appendStructureShapes(ModelBlockEntity entity, StructureForm structure, Box query, List<VoxelShape> collisions)
+    private static void appendStructureShapes(ModelBlockEntity entity, StructureForm structure, AABB query, List<VoxelShape> collisions)
     {
         StructureCollisionData data = StructureCollisionData.get(structure.structureFile.get());
 
@@ -195,7 +195,7 @@ public final class ModelBlockSolidCollisions
         }
 
         Matrix4f matrix = buildStructureWorldMatrix(entity, structure);
-        Box worldBounds = transformBox(data.localBounds, matrix);
+        AABB worldBounds = transformBox(data.localBounds, matrix);
 
         if (!worldBounds.intersects(query))
         {
@@ -205,20 +205,20 @@ public final class ModelBlockSolidCollisions
         Matrix4f inverse = new Matrix4f(matrix).invert();
 
         /* Conservative local AABB of the world query — only nearby meshed boxes are transformed. */
-        Box localQuery = transformBox(query, inverse).expand(0.05D);
+        AABB localQuery = transformBox(query, inverse).inflate(0.05D);
 
         data.forEachOverlapping(localQuery, (local) ->
         {
-            Box worldBox = transformBox(local, matrix);
+            AABB worldBox = transformBox(local, matrix);
 
-            if (worldBox.intersects(query) && worldBox.getAverageSideLength() > 1.0E-4D)
+            if (worldBox.intersects(query) && getAverageSideLength(worldBox) > 1.0E-4D)
             {
-                collisions.add(VoxelShapes.cuboid(worldBox));
+                collisions.add(Shapes.create(worldBox));
             }
         });
     }
 
-    private static void appendModelShapes(ModelBlockEntity entity, ModelForm form, Box query, List<VoxelShape> collisions)
+    private static void appendModelShapes(ModelBlockEntity entity, ModelForm form, AABB query, List<VoxelShape> collisions)
     {
         ModelCollisionData data = ModelCollisionData.get(form);
 
@@ -231,27 +231,27 @@ public final class ModelBlockSolidCollisions
 
         if (data.skinnedVertices != null)
         {
-            Box worldBounds = transformBox(data.localBounds, matrix);
+            AABB worldBounds = transformBox(data.localBounds, matrix);
 
             if (!worldBounds.intersects(query))
             {
                 return;
             }
 
-            List<Box> worldSlabs = ModelCollisionData.buildWorldSpaceBobjSlabs(data.skinnedVertices, matrix);
+            List<AABB> worldSlabs = ModelCollisionData.buildWorldSpaceBobjSlabs(data.skinnedVertices, matrix);
 
-            for (Box worldBox : worldSlabs)
+            for (AABB worldBox : worldSlabs)
             {
-                if (worldBox.intersects(query) && worldBox.getAverageSideLength() > 1.0E-4D)
+                if (worldBox.intersects(query) && getAverageSideLength(worldBox) > 1.0E-4D)
                 {
-                    collisions.add(VoxelShapes.cuboid(worldBox));
+                    collisions.add(Shapes.create(worldBox));
                 }
             }
 
             return;
         }
 
-        Box worldBounds = transformBox(data.localBounds, matrix);
+        AABB worldBounds = transformBox(data.localBounds, matrix);
 
         if (!worldBounds.intersects(query))
         {
@@ -261,15 +261,15 @@ public final class ModelBlockSolidCollisions
         appendBoxes(data.localBoxes, matrix, query, collisions);
     }
 
-    private static void appendBoxes(List<Box> localBoxes, Matrix4f matrix, Box query, List<VoxelShape> collisions)
+    private static void appendBoxes(List<AABB> localBoxes, Matrix4f matrix, AABB query, List<VoxelShape> collisions)
     {
-        for (Box local : localBoxes)
+        for (AABB local : localBoxes)
         {
-            Box worldBox = transformBox(local, matrix);
+            AABB worldBox = transformBox(local, matrix);
 
-            if (worldBox.intersects(query) && worldBox.getAverageSideLength() > 1.0E-4D)
+            if (worldBox.intersects(query) && getAverageSideLength(worldBox) > 1.0E-4D)
             {
-                collisions.add(VoxelShapes.cuboid(worldBox));
+                collisions.add(Shapes.create(worldBox));
             }
         }
     }
@@ -295,7 +295,7 @@ public final class ModelBlockSolidCollisions
 
     private static Matrix4f buildBaseWorldMatrix(ModelBlockEntity entity, Form form)
     {
-        BlockPos pos = entity.getPos();
+        BlockPos pos = entity.getBlockPos();
         ModelProperties properties = entity.getProperties();
         Transform modelTransform = properties.getTransform().copy();
         Transform formTransform = composeFormTransform(form, entity.getEntity().getAge());
@@ -343,7 +343,7 @@ public final class ModelBlockSolidCollisions
         transform.pivot.add(overlay.pivot);
     }
 
-    private static Box transformBox(Box box, Matrix4f matrix)
+    private static AABB transformBox(AABB box, Matrix4f matrix)
     {
         Vector4f c000 = new Vector4f((float) box.minX, (float) box.minY, (float) box.minZ, 1F).mul(matrix);
         Vector4f c001 = new Vector4f((float) box.minX, (float) box.minY, (float) box.maxZ, 1F).mul(matrix);
@@ -360,7 +360,12 @@ public final class ModelBlockSolidCollisions
         double maxY = max8(c000.y, c001.y, c010.y, c011.y, c100.y, c101.y, c110.y, c111.y);
         double maxZ = max8(c000.z, c001.z, c010.z, c011.z, c100.z, c101.z, c110.z, c111.z);
 
-        return new Box(minX, minY, minZ, maxX, maxY, maxZ);
+        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    private static double getAverageSideLength(AABB box)
+    {
+        return ((box.maxX - box.minX) + (box.maxY - box.minY) + (box.maxZ - box.minZ)) / 3.0D;
     }
 
     private static double min8(float a, float b, float c, float d, float e, float f, float g, float h)
@@ -383,9 +388,9 @@ public final class ModelBlockSolidCollisions
         return new ArrayList<>(collisions);
     }
 
-    public static Box sweptBox(Entity entity, Vec3d movement)
+    public static AABB sweptBox(Entity entity, Vec3 movement)
     {
-        return entity.getBoundingBox().stretch(movement);
+        return entity.getBoundingBox().expandTowards(movement);
     }
 
     /**
@@ -395,7 +400,7 @@ public final class ModelBlockSolidCollisions
      */
     public static float boostStepHeight(Entity entity, float stepHeight)
     {
-        if (entity == null || entity.getEntityWorld() == null)
+        if (entity == null || entity.level() == null)
         {
             return stepHeight;
         }
@@ -412,13 +417,13 @@ public final class ModelBlockSolidCollisions
             return stepHeight;
         }
 
-        Box feet = entity.getBoundingBox();
-        Box probe = feet.expand(0.4D, 0D, 0.4D).stretch(0D, CLIMB_STEP_HEIGHT + 0.05D, 0D);
-        World world = entity.getEntityWorld();
+        AABB feet = entity.getBoundingBox();
+        AABB probe = feet.inflate(0.4D, 0D, 0.4D).expandTowards(0D, CLIMB_STEP_HEIGHT + 0.05D, 0D);
+        Level world = entity.level();
 
         for (ModelBlockEntity model : active)
         {
-            if (model.isRemoved() || model.getWorld() != world)
+            if (model.isRemoved() || model.getLevel() != world)
             {
                 continue;
             }
@@ -444,10 +449,10 @@ public final class ModelBlockSolidCollisions
         return stepHeight;
     }
 
-    private static boolean hasClimbableBox(ModelBlockEntity entity, StructureForm structure, ModelForm modelForm, Box feet, Box probe)
+    private static boolean hasClimbableBox(ModelBlockEntity entity, StructureForm structure, ModelForm modelForm, AABB feet, AABB probe)
     {
-        List<Box> localBoxes;
-        Box localBounds;
+        List<AABB> localBoxes;
+        AABB localBounds;
         Matrix4f matrix;
 
         if (structure != null)
@@ -460,7 +465,7 @@ public final class ModelBlockSolidCollisions
             }
 
             matrix = buildStructureWorldMatrix(entity, structure);
-            Box worldBounds = transformBox(data.localBounds, matrix);
+            AABB worldBounds = transformBox(data.localBounds, matrix);
 
             if (!worldBounds.intersects(probe))
             {
@@ -468,7 +473,7 @@ public final class ModelBlockSolidCollisions
             }
 
             Matrix4f inverse = new Matrix4f(matrix).invert();
-            Box localQuery = transformBox(probe, inverse).expand(0.05D);
+            AABB localQuery = transformBox(probe, inverse).inflate(0.05D);
             boolean[] found = new boolean[1];
 
             data.forEachOverlapping(localQuery, (local) ->
@@ -500,14 +505,14 @@ public final class ModelBlockSolidCollisions
 
             if (data.skinnedVertices != null)
             {
-                Box worldBounds = transformBox(localBounds, matrix);
+                AABB worldBounds = transformBox(localBounds, matrix);
 
                 if (!worldBounds.intersects(probe))
                 {
                     return false;
                 }
 
-                for (Box worldBox : ModelCollisionData.buildWorldSpaceBobjSlabs(data.skinnedVertices, matrix))
+                for (AABB worldBox : ModelCollisionData.buildWorldSpaceBobjSlabs(data.skinnedVertices, matrix))
                 {
                     if (isClimbableWorldBox(worldBox, feet, probe))
                     {
@@ -525,7 +530,7 @@ public final class ModelBlockSolidCollisions
             return false;
         }
 
-        Box worldBounds = transformBox(localBounds, matrix);
+        AABB worldBounds = transformBox(localBounds, matrix);
 
         if (!worldBounds.intersects(probe))
         {
@@ -535,9 +540,9 @@ public final class ModelBlockSolidCollisions
         return hasClimbableFromBoxes(localBoxes, matrix, feet, probe);
     }
 
-    private static boolean hasClimbableFromBoxes(List<Box> localBoxes, Matrix4f matrix, Box feet, Box probe)
+    private static boolean hasClimbableFromBoxes(List<AABB> localBoxes, Matrix4f matrix, AABB feet, AABB probe)
     {
-        for (Box local : localBoxes)
+        for (AABB local : localBoxes)
         {
             if (isClimbableWorldBox(transformBox(local, matrix), feet, probe))
             {
@@ -548,7 +553,7 @@ public final class ModelBlockSolidCollisions
         return false;
     }
 
-    private static boolean isClimbableWorldBox(Box worldBox, Box feet, Box probe)
+    private static boolean isClimbableWorldBox(AABB worldBox, AABB feet, AABB probe)
     {
         /* Use ledge height above the feet, not full AABB height (rotation inflates AABB). */
         double ledge = worldBox.maxY - feet.minY;
