@@ -52,9 +52,9 @@ public class UISubtitleRenderer
         });
     }
 
-    public static void renderSubtitles(MatrixStack stack, Batcher2D batcher, List<Subtitle> subtitles)
+    public static void renderSubtitles(MatrixStack stack, Batcher2D batcher, List<Subtitle> subtitles, int frameW, int frameH)
     {
-        if (subtitles.isEmpty())
+        if (subtitles.isEmpty() || frameW <= 0 || frameH <= 0)
         {
             return;
         }
@@ -65,8 +65,6 @@ public class UISubtitleRenderer
         Supplier<ShaderProgram> supplier = () -> program;
 
         net.minecraft.client.gl.Framebuffer fb = MinecraftClient.getInstance().getFramebuffer();
-        int width = fb.textureWidth;
-        int height = fb.textureHeight;
 
         /* Text-atlas FBO applyClear() shrinks glViewport; beginWrite(false) alone may not
          * restore it (same class of bug as UIFilmController stencil picking). Save so
@@ -77,8 +75,11 @@ public class UISubtitleRenderer
 
         Matrix4f cache = new Matrix4f(RenderSystem.getProjectionMatrix());
 
-        width /= 2;
-        height /= 2;
+        /* Pre-4fd65c0 used framebuffer texture size / 2 as the subtitle ortho space.
+         * Size is absolute GUI/font pixels (unlike Image %), so that half-space must
+         * stay — full video ortho made the same bake appear ~half as large. */
+        int width = frameW / 2;
+        int height = frameH / 2;
 
         Framebuffer framebuffer = getTextFramebuffer();
         Texture texture = framebuffer.getMainTexture();
@@ -230,13 +231,13 @@ public class UISubtitleRenderer
         RenderSystem.enableCull();
     }
 
-    public static void renderSubtitle(MatrixStack stack, Batcher2D batcher, Subtitle subtitle)
+    public static void renderSubtitle(MatrixStack stack, Batcher2D batcher, Subtitle subtitle, int frameW, int frameH)
     {
         if (subtitle == null)
         {
             return;
         }
 
-        renderSubtitles(stack, batcher, Collections.singletonList(subtitle));
+        renderSubtitles(stack, batcher, Collections.singletonList(subtitle), frameW, frameH);
     }
 }

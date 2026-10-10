@@ -167,12 +167,12 @@ public class ScreenEffectRenderer
             }
             else if (imgOrder == nextOrder)
             {
-                UIImageRenderer.renderImage(matrices, batcher, images.get(imageIndex));
+                UIImageRenderer.renderImage(matrices, batcher, images.get(imageIndex), screenW, screenH);
                 imageIndex += 1;
             }
             else if (subOrder == nextOrder)
             {
-                UISubtitleRenderer.renderSubtitle(matrices, batcher, subtitles.get(subtitleIndex));
+                UISubtitleRenderer.renderSubtitle(matrices, batcher, subtitles.get(subtitleIndex), screenW, screenH);
                 subtitleIndex += 1;
             }
             else if (hotOrder == nextOrder)
