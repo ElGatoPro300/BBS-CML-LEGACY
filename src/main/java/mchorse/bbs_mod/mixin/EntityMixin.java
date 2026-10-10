@@ -4,27 +4,61 @@ import mchorse.bbs_mod.entity.IEntityFormProvider;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.structure.ModelBlockSolidCollisions;
 import mchorse.bbs_mod.morphing.IMorphProvider;
+import mchorse.bbs_mod.morphing.Morph;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPose;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(Entity.class)
 public class EntityMixin
 {
+    @Inject(method = "getEyeHeight", at = @At("HEAD"), cancellable = true)
+    public void getEyeHeight(EntityPose pose, CallbackInfoReturnable<Float> info)
+    {
+        if (this instanceof IMorphProvider provider)
+        {
+            Morph morph = provider.getMorph();
+
+            if (morph != null)
+            {
+                Form form = morph.getForm();
+
+                if (form != null && form.hitbox.get())
+                {
+                    PlayerEntity player = (PlayerEntity) (Object) this;
+                    float height = form.hitboxHeight.get() * (player.isSneaking() ? form.hitboxSneakMultiplier.get() : 1F);
+
+                    info.setReturnValue(form.hitboxEyeHeight.get() * height);
+                }
+            }
+        }
+        else if (this instanceof IEntityFormProvider provider)
+        {
+            Form form = provider.getForm();
+
+            if (form != null && form.hitbox.get())
+            {
+                Entity entity = (Entity) (Object) this;
+                float height = form.hitboxHeight.get() * (entity.isSneaking() ? form.hitboxSneakMultiplier.get() : 1F);
+
+                info.setReturnValue(form.hitboxEyeHeight.get() * height);
+            }
+        }
+    }
+    
     @Inject(method = "isCollidable", at = @At("HEAD"), cancellable = true)
     public void onIsCollidable(CallbackInfoReturnable<Boolean> info)
     {
@@ -72,31 +106,25 @@ public class EntityMixin
     }
 
     /**
-     * Inject solid model/structure hitboxes into entity movement collisions in 1.20.4.
+     * Inject solid model/structure hitboxes into every movement collision list,
+     * including the step-up pass ({@code list2}) which previously only saw block shapes.
      */
-    @ModifyVariable(
-        method = "adjustMovementForCollisions(Lnet/minecraft/entity/Entity;Lnet/minecraft/util/math/Vec3d;Lnet/minecraft/util/math/Box;Lnet/minecraft/world/World;Ljava/util/List;)Lnet/minecraft/util/math/Vec3d;",
-        at = @At("HEAD"),
-        argsOnly = true,
-        ordinal = 0
-    )
-    private static List<VoxelShape> bbs$appendSolidHitboxes(
-        List<VoxelShape> collisions,
+    @Inject(method = "findCollisionsForMovement", at = @At("RETURN"), cancellable = true)
+    private static void bbs$appendSolidHitboxes(
         @Nullable Entity entity,
-        Vec3d movement,
-        Box entityBoundingBox,
-        World world)
+        World world,
+        List<VoxelShape> regularCollisions,
+        Box movingEntityBoundingBox,
+        CallbackInfoReturnable<List<VoxelShape>> info)
     {
-        if (entity == null || world == null || entityBoundingBox == null)
+        if (entity == null || world == null || movingEntityBoundingBox == null)
         {
-            return collisions;
+            return;
         }
 
-        List<VoxelShape> mutable = new ArrayList<>(collisions);
-        Box swept = movement != null ? entityBoundingBox.stretch(movement) : entityBoundingBox;
+        List<VoxelShape> mutable = ModelBlockSolidCollisions.wrapMutable(info.getReturnValue());
 
-        ModelBlockSolidCollisions.appendShapes(entity, swept, world, mutable);
-
-        return mutable;
+        ModelBlockSolidCollisions.appendShapes(entity, movingEntityBoundingBox, world, mutable);
+        info.setReturnValue(mutable);
     }
 }

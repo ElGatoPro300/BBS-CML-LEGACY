@@ -398,17 +398,16 @@ public class FormOutlineRenderer
 
     private static void drawFullscreenQuad(float z)
     {
-        BufferBuilder builder = Tessellator.getInstance().getBuffer();
-        builder.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
+        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
 
         /* Two triangles covering the full screen in NDC space. */
-        builder.vertex(-1F, -1F, z).texture(0F, 0F).next();
-        builder.vertex(1F, -1F, z).texture(1F, 0F).next();
-        builder.vertex(1F, 1F, z).texture(1F, 1F).next();
+        builder.vertex(-1F, -1F, z).texture(0F, 0F);
+        builder.vertex(1F, -1F, z).texture(1F, 0F);
+        builder.vertex(1F, 1F, z).texture(1F, 1F);
 
-        builder.vertex(-1F, -1F, z).texture(0F, 0F).next();
-        builder.vertex(1F, 1F, z).texture(1F, 1F).next();
-        builder.vertex(-1F, 1F, z).texture(0F, 1F).next();
+        builder.vertex(-1F, -1F, z).texture(0F, 0F);
+        builder.vertex(1F, 1F, z).texture(1F, 1F);
+        builder.vertex(-1F, 1F, z).texture(0F, 1F);
 
         BufferRenderer.drawWithGlobalProgram(builder.end());
     }

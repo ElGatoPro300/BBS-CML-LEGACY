@@ -1987,8 +1987,8 @@ public class StructurePickerClient
             return;
         }
 
-        BlockPos min = blocks.get(0);
-        BlockPos max = blocks.get(0);
+        BlockPos min = blocks.getFirst();
+        BlockPos max = blocks.getFirst();
 
         for (BlockPos pos : blocks)
         {
@@ -2232,11 +2232,6 @@ public class StructurePickerClient
         StructurePickerClient.renderHudLine(batcher, screenW, screenH, lineIndex, text);
     }
 
-    private static double getPlayerReach(MinecraftClient mc)
-    {
-        return mc.interactionManager != null ? mc.interactionManager.getReachDistance() : 4.5D;
-    }
-
     private static double getPickerReach(MinecraftClient mc)
     {
         if (Window.isCtrlPressed())
@@ -2249,7 +2244,6 @@ public class StructurePickerClient
 
     private static double getAirClickReach(MinecraftClient mc)
     {
-
         return StructurePickerClient.getPickerReach(mc);
     }
 
@@ -2262,7 +2256,6 @@ public class StructurePickerClient
         StructurePickerMode mode = StructurePickerClient.mode;
 
         return mode != null && !mode.isPaintMode() && !mode.isEraseMode();
-
     }
 
     private static BlockPos resolveTargetBlock(MinecraftClient mc)

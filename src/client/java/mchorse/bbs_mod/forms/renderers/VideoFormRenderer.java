@@ -115,7 +115,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
             Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
             Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
-            RenderSystem.setupLevelDiffuseLighting(light0, light1, RenderSystem.getModelViewMatrix());
+            RenderSystem.setupLevelDiffuseLighting(light0, light1);
 
             this.renderModel(stack, Colors.WHITE, context.getTransition(), null, true, true, null);
         }
@@ -950,8 +950,8 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
         stack.peek().getNormalMatrix().identity();
 
         MatrixStack.Entry entry = stack.peek();
-        BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-        buffer.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
+        BufferBuilder buffer = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
 
         this.irisVert(buffer, entry, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, tint, overlay, light);
         this.irisVert(buffer, entry, quad.p4.x, quad.p4.y, FACE_Z_BIAS, 1F, 1F, tint, overlay, light);
@@ -1003,8 +1003,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(depthWrite);
 
-            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-            buffer.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
+            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE);
 
             this.tex(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F);
             this.tex(buffer, matrix, quad.p4.x, quad.p4.y, FACE_Z_BIAS, 1F, 1F);
@@ -1038,8 +1037,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             .texture(u, v)
             .overlay(overlay)
             .light(light)
-            .normal(entry.getNormalMatrix(), 0F, 0F, 1F)
-            .next();
+            .normal(entry, 0F, 0F, 1F);
     }
 
     /**
@@ -1074,8 +1072,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(true);
 
-            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-            buffer.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_LIGHT_COLOR);
+            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_LIGHT_COLOR);
 
             /* Same UV winding as {@link #drawVideoFront}. */
             this.pickVert(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, light, pickColor);
@@ -1105,7 +1102,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
     private void pickVert(BufferBuilder buffer, Matrix4f matrix, float x, float y, float z, float u, float v, int light, Color color)
     {
-        buffer.vertex(matrix, x, y, z).texture(u, v).light(light).color(color.r, color.g, color.b, color.a).next();
+        buffer.vertex(matrix, x, y, z).texture(u, v).light(light).color(color.r, color.g, color.b, color.a);
     }
 
     private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, Supplier<ShaderProgram> shader)
@@ -1123,8 +1120,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(true);
 
-            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
-            buffer.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
 
             this.col(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, color);
             this.col(buffer, matrix, quad.p2.x, quad.p2.y, FACE_Z_BIAS, color);
@@ -1153,12 +1149,12 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
     private void tex(BufferBuilder buffer, Matrix4f matrix, float x, float y, float z, float u, float v)
     {
-        buffer.vertex(matrix, x, y, z).texture(u, v).next();
+        buffer.vertex(matrix, x, y, z).texture(u, v);
     }
 
     private void col(BufferBuilder buffer, Matrix4f matrix, float x, float y, float z, Color color)
     {
-        buffer.vertex(matrix, x, y, z).color(color.r, color.g, color.b, color.a).next();
+        buffer.vertex(matrix, x, y, z).color(color.r, color.g, color.b, color.a);
     }
 
     private Color resolveTint(int overlayColor)

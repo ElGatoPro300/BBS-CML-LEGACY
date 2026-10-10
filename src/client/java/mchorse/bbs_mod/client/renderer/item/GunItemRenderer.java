@@ -92,7 +92,7 @@ public class GunItemRenderer implements BuiltinItemRendererRegistry.DynamicItemR
                 {
                     int renderLight = mode == ModelTransformationMode.GUI ? LightmapTextureManager.MAX_LIGHT_COORDINATE : light;
                     FormRenderingContext context = new FormRenderingContext()
-                        .set(FormRenderType.fromModelMode(mode), item.formEntity, matrices, renderLight, overlay, MinecraftClient.getInstance().getTickDelta());
+                        .set(FormRenderType.fromModelMode(mode), item.formEntity, matrices, renderLight, overlay, MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false));
 
                     if (mode == ModelTransformationMode.GUI)
                     {

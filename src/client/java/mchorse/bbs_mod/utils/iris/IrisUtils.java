@@ -18,6 +18,8 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.gui.screen.ShaderPackScreen;
+import net.irisshaders.iris.pbr.TextureTracker;
+import net.irisshaders.iris.pbr.loader.PBRTextureLoaderRegistry;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.shaderpack.LanguageMap;
@@ -29,8 +31,6 @@ import net.irisshaders.iris.shaderpack.option.menu.OptionMenuLinkElement;
 import net.irisshaders.iris.shaderpack.option.menu.OptionMenuOptionElement;
 import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
 import net.irisshaders.iris.shadows.ShadowRenderer;
-import net.irisshaders.iris.texture.TextureTracker;
-import net.irisshaders.iris.texture.pbr.loader.PBRTextureLoaderRegistry;
 import net.irisshaders.iris.uniforms.custom.cached.CachedUniform;
 import net.irisshaders.iris.uniforms.custom.cached.FloatCachedUniform;
 import net.irisshaders.iris.uniforms.custom.cached.IntCachedUniform;
@@ -57,8 +57,6 @@ public class IrisUtils
     private static final ThreadLocal<PBRIntensity> activePBRIntensity = new ThreadLocal<>();
     private static ShaderProperties properties;
     private static int offscreenDepth;
-    private static Method setIsMainBoundMethod;
-    private static boolean setIsMainBoundChecked;
 
     public static void setMainBound(boolean bound)
     {
@@ -66,34 +64,7 @@ public class IrisUtils
 
         if (pipeline != null)
         {
-            if (!setIsMainBoundChecked)
-            {
-                setIsMainBoundChecked = true;
-
-                try
-                {
-                    setIsMainBoundMethod = pipeline.getClass().getMethod("setIsMainBound", boolean.class);
-                }
-                catch (Throwable t)
-                {
-                    try
-                    {
-                        setIsMainBoundMethod = pipeline.getClass().getMethod("setMainBound", boolean.class);
-                    }
-                    catch (Throwable ignored)
-                    {}
-                }
-            }
-
-            if (setIsMainBoundMethod != null)
-            {
-                try
-                {
-                    setIsMainBoundMethod.invoke(pipeline, bound);
-                }
-                catch (Throwable ignored)
-                {}
-            }
+            pipeline.setIsMainBound(bound);
         }
     }
 
@@ -114,7 +85,7 @@ public class IrisUtils
         {
             if (override)
             {
-                setMainBound(false);
+                pipeline.setIsMainBound(false);
             }
 
             offscreenDepth += 1;
@@ -129,7 +100,7 @@ public class IrisUtils
 
             if (override)
             {
-                setMainBound(true);
+                pipeline.setIsMainBound(true);
             }
         }
     }

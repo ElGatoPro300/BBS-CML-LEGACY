@@ -277,8 +277,7 @@ public class StructurePickerRenderer
             return;
         }
 
-        BufferBuilder builder = Tessellator.getInstance().getBuffer();
-        builder.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
 
         stack.push();
         stack.translate(x, y, z);
@@ -294,8 +293,7 @@ public class StructurePickerRenderer
         float fh = (float) h;
         float fd = (float) d;
         float t = 1F / 96F + (float) (Math.sqrt(w * w + h * h + d * d) / 2000D);
-        BufferBuilder builder = Tessellator.getInstance().getBuffer();
-        builder.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
 
         stack.push();
         stack.translate(x, y, z);

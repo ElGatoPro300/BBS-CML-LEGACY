@@ -107,6 +107,7 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             : resolvedPaint;
 
         DiffuseLighting.enableGuiDepthLighting();
+
         ModelTransformationMode mode = this.form.modelTransform.get();
 
         consumers.setSubstitute(this.getMainConsumer(set, mainPassPaint));
@@ -676,8 +677,8 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             overlayStack.peek().getPositionMatrix().set(exactStack);
             overlayStack.peek().getNormalMatrix().set(normalMatrix);
 
-            RenderSystem.getModelViewStack().push();
-            RenderSystem.getModelViewStack().peek().getPositionMatrix().set(exactMvm);
+            RenderSystem.getModelViewStack().pushMatrix();
+            RenderSystem.getModelViewStack().set(exactMvm);
             RenderSystem.applyModelViewMatrix();
 
             try
@@ -686,7 +687,7 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             }
             finally
             {
-                RenderSystem.getModelViewStack().pop();
+                RenderSystem.getModelViewStack().popMatrix();
                 RenderSystem.applyModelViewMatrix();
             }
         });
@@ -766,8 +767,8 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             overlayStack.peek().getPositionMatrix().set(exactStack);
             overlayStack.peek().getNormalMatrix().set(normalMatrix);
 
-            RenderSystem.getModelViewStack().push();
-            RenderSystem.getModelViewStack().peek().getPositionMatrix().set(exactMvm);
+            RenderSystem.getModelViewStack().pushMatrix();
+            RenderSystem.getModelViewStack().set(exactMvm);
             RenderSystem.applyModelViewMatrix();
 
             try
@@ -776,7 +777,7 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             }
             finally
             {
-                RenderSystem.getModelViewStack().pop();
+                RenderSystem.getModelViewStack().popMatrix();
                 RenderSystem.applyModelViewMatrix();
             }
         });
@@ -917,8 +918,8 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             overlayStack.peek().getPositionMatrix().set(exactStack);
             overlayStack.peek().getNormalMatrix().set(normalMatrix);
 
-            RenderSystem.getModelViewStack().push();
-            RenderSystem.getModelViewStack().peek().getPositionMatrix().set(exactMvm);
+            RenderSystem.getModelViewStack().pushMatrix();
+            RenderSystem.getModelViewStack().set(exactMvm);
             RenderSystem.applyModelViewMatrix();
 
             try
@@ -927,7 +928,7 @@ public class ItemFormRenderer extends FormRenderer<ItemForm>
             }
             finally
             {
-                RenderSystem.getModelViewStack().pop();
+                RenderSystem.getModelViewStack().popMatrix();
                 RenderSystem.applyModelViewMatrix();
             }
         });

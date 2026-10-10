@@ -267,6 +267,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
     {
         /* FRONT cull only for offscreen content fill (Y-flipped ortho). Restored before blit. */
         GL30.glCullFace(GL30.GL_FRONT);
+
         /* Iris pack: bake flat albedo (Unlit) — pack state can black out limbs if we mix_light
          * inside the FBO; the lit display quad applies world shading once.
          * No pack (root morph / top-level): bake matching world diffuse + caller lightmap into
@@ -298,8 +299,8 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
          * view extent even when the FBO is capped — then density drops (pixelates)
          * instead of allocating past {@link #MAX_FRAMEBUFFER_EDGE}. */
         RenderSystem.setProjectionMatrix(new Matrix4f().setOrtho(-halfX, halfX, halfY, -halfY, -500F, 500F), VertexSorter.BY_Z);
-        RenderSystem.getModelViewStack().push();
-        RenderSystem.getModelViewStack().loadIdentity();
+        RenderSystem.getModelViewStack().pushMatrix();
+        RenderSystem.getModelViewStack().identity();
         RenderSystem.applyModelViewMatrix();
 
         framebuffer.apply();
@@ -408,7 +409,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         }
 
         RenderSystem.setShaderLights(light0, light1);
-        RenderSystem.getModelViewStack().pop();
+        RenderSystem.getModelViewStack().popMatrix();
         RenderSystem.applyModelViewMatrix();
 
         RenderSystem.setProjectionMatrix(projectionMatrix, vertexSorter);
@@ -546,7 +547,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
                 this.capturedPreBillboard.set(matrices.peek().getPositionMatrix());
             }
 
-            this.applyLookAtBillboard(matrices);
+            this.applyLookAtBillboard(matrices, this.lookAtCamera, this.lookAtViewSpaceAlready);
 
             if (this.lookAtViewSpaceAlready)
             {
@@ -555,8 +556,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             }
         }
 
-        BufferBuilder builder = Tessellator.getInstance().getBuffer();
-        builder.begin(VertexFormat.DrawMode.TRIANGLES, format);
+        BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, format);
         Color color = Color.white();
         MatrixStack.Entry entry = matrices.peek();
         Matrix4f matrix = entry.getPositionMatrix();
@@ -784,10 +784,14 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
     }
 
     /**
-     * Face the display quad at the camera (yaw + pitch), same bake as Billboard/Label.
-     * Keep translate/scale; reset rotation to identity in camera view space.
+     * Face the display quad at the camera (yaw + pitch), same bake as Video/Label.
+     * Keep translate/scale; replace rotation with {@code camera.view} in world space.
+     *
+     * @param viewSpaceAlready when true (form-editor orbit), the draw/gizmo path already
+     *                         applies {@code camera.view} — identity rotation faces the
+     *                         viewer; baking view again double-transforms and breaks gizmos.
      */
-    private void applyLookAtBillboard(MatrixStack matrices)
+    private void applyLookAtBillboard(MatrixStack matrices, Camera camera, boolean viewSpaceAlready)
     {
         Matrix4f modelMatrix = matrices.peek().getPositionMatrix();
         Vector3f scale = new Vector3f();
@@ -796,6 +800,11 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         modelMatrix.m00(1).m01(0).m02(0);
         modelMatrix.m10(0).m11(1).m12(0);
         modelMatrix.m20(0).m21(0).m22(1);
+
+        if (!viewSpaceAlready)
+        {
+            modelMatrix.mul(camera.view);
+        }
 
         modelMatrix.scale(scale);
 
@@ -859,20 +868,14 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         stack.peek().getNormalMatrix().set(normal);
     }
 
-    private void fill(VertexFormat format, VertexConsumer consumer, Matrix4f matrix, float x, float y, Color color, float u, float v, int overlay, int light, MatrixStack.Entry entry, float nz)
+    private VertexConsumer fill(VertexFormat format, VertexConsumer consumer, Matrix4f matrix, float x, float y, Color color, float u, float v, int overlay, int light, MatrixStack.Entry entry, float nz)
     {
-        if (format == VertexFormats.POSITION_TEXTURE_LIGHT_COLOR)
-        {
-            consumer.vertex(matrix, x, y, 0F).texture(u, v).light(light).color(color.r, color.g, color.b, color.a).next();
-            return;
-        }
         if (format == VertexFormats.POSITION_TEXTURE_COLOR)
         {
-            consumer.vertex(matrix, x, y, 0F).texture(u, v).color(color.r, color.g, color.b, color.a).next();
-            return;
+            return consumer.vertex(matrix, x, y, 0F).texture(u, v).color(color.r, color.g, color.b, color.a);
         }
 
-        consumer.vertex(matrix, x, y, 0F).color(color.r, color.g, color.b, color.a).texture(u, v).overlay(overlay).light(light).normal(entry.getNormalMatrix(), 0F, 0F, nz).next();
+        return consumer.vertex(matrix, x, y, 0F).color(color.r, color.g, color.b, color.a).texture(u, v).overlay(overlay).light(light).normal(entry, 0F, 0F, nz);
     }
 
     @Override
@@ -914,8 +917,8 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             }
             else if (!viewSpaceAlready)
             {
-                /* World/film: model matrix has no orbit view yet. */
-                this.applyLookAtBillboard(stack);
+                /* World/film: model matrix has no orbit view yet — bake camera.view. */
+                this.applyLookAtBillboard(stack, this.lookAtCamera, false);
             }
             /* Editor without capture yet: keep form matrix (one frame). */
         }

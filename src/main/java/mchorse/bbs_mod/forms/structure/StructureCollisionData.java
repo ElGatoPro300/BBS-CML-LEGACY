@@ -517,7 +517,7 @@ public final class StructureCollisionData
 
         try
         {
-            block = Registries.BLOCK.get(new Identifier(name));
+            block = Registries.BLOCK.get(Identifier.of(name));
 
             if (block == null)
             {
