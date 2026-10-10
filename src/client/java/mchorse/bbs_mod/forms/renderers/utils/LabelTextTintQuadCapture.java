@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.forms.renderers.utils;
 
-import net.minecraft.client.renderer.MultiBufferSource;
+import mchorse.bbs_mod.client.renderer.MultiBufferSource;
+
 import net.minecraft.client.renderer.rendertype.RenderType;
 
 import org.joml.Matrix4fc;

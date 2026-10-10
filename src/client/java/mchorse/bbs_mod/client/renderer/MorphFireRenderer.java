@@ -15,7 +15,6 @@ import mchorse.bbs_mod.utils.interps.Lerps;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -42,7 +41,7 @@ public final class MorphFireRenderer
     private MorphFireRenderer()
     {}
 
-    public static void render(PoseStack matrices, MultiBufferSource consumers, IEntity morph, Form form, float tickDelta, Camera camera, boolean relative)
+    public static void render(PoseStack matrices, IEntity morph, Form form, float tickDelta, Camera camera, boolean relative)
     {
         if (morph.getFireTicks() <= 0)
         {

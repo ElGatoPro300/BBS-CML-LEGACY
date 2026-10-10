@@ -11,6 +11,7 @@ import mchorse.bbs_mod.camera.controller.CameraWorkCameraController;
 import mchorse.bbs_mod.camera.controller.PlayCameraController;
 import mchorse.bbs_mod.client.compat.HdrModCompat;
 import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
+import mchorse.bbs_mod.client.renderer.WorldFormRenderer;
 import mchorse.bbs_mod.client.screen.ScreenEffectRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
@@ -34,6 +35,7 @@ import mchorse.bbs_mod.forms.renderers.utils.RecolorVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.TextGlowEmissionVertexConsumer;
 import mchorse.bbs_mod.forms.renderers.utils.TextGlowEmissionVertexSodiumConsumer;
 import mchorse.bbs_mod.client.video.VideoRenderer;
+import mchorse.bbs_mod.graphics.RenderPipelineUtils;
 import mchorse.bbs_mod.graphics.WorldOverlayRenderer;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.graphics.texture.TextureFormat;
@@ -63,11 +65,12 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 import net.irisshaders.iris.uniforms.custom.cached.CachedUniform;
@@ -117,6 +120,8 @@ public class BBSRendering
     /** Vanilla level diffuse basis (same as UIModelRenderer / DiffuseLighting world pass). */
     private static final Vector3f WORLD_LEVEL_LIGHT_0 = new Vector3f(0.2F, 1.0F, -0.7F).normalize();
     private static final Vector3f WORLD_LEVEL_LIGHT_1 = new Vector3f(-0.2F, 1.0F, 0.7F).normalize();
+
+    private static final Vector4f CLEAR_COLOR = new Vector4f(0F, 0F, 0F, 0F);
 
     public static boolean canRender;
 
@@ -240,6 +245,28 @@ public class BBSRendering
         lensOverscanScale = Math.abs(scale - 1F) > 1.0e-4F ? scale : 1F;
     }
 
+    public static void setHideGui(boolean hide)
+    {
+        Minecraft mc = Minecraft.getInstance();
+
+        if (mc != null && mc.gui != null && mc.gui.hud != null)
+        {
+            mc.gui.hud.isHidden = hide;
+        }
+    }
+
+    public static boolean isHideGui()
+    {
+        Minecraft mc = Minecraft.getInstance();
+
+        if (mc != null && mc.gui != null && mc.gui.hud != null)
+        {
+            return mc.gui.hud.isHidden;
+        }
+
+        return false;
+    }
+
     public static int getVideoFrameRate()
     {
         int frameRate = BBSSettings.videoSettings.frameRate.get();
@@ -266,6 +293,23 @@ public class BBSRendering
         movies.mkdirs();
 
         return movies.getAbsoluteFile();
+    }
+
+    public static SubmitNodeStorage getSubmitNodeStorage()
+    {
+        Minecraft client = Minecraft.getInstance();
+
+        if (client.level != null && client.levelRenderer != null && isRenderingWorld())
+        {
+            return client.levelRenderer.submitNodeStorage;
+        }
+
+        if (client.gameRenderer != null)
+        {
+            return client.gameRenderer.handAndScreenSubmitNodeStorage;
+        }
+
+        return null;
     }
 
     public static boolean canReplaceFramebuffer()
@@ -306,7 +350,7 @@ public class BBSRendering
      */
     public static void bindMainFramebuffer(boolean clear)
     {
-        RenderTarget fb = Minecraft.getInstance().getMainRenderTarget();
+        RenderTarget fb = Minecraft.getInstance().gameRenderer != null ? Minecraft.getInstance().gameRenderer.mainRenderTarget() : null;
 
         RenderSystem.outputColorTextureOverride = null;
         RenderSystem.outputDepthTextureOverride = null;
@@ -314,7 +358,7 @@ public class BBSRendering
         if (clear && fb != null && fb.getColorTexture() != null && fb.getDepthTexture() != null)
         {
             RenderSystem.getDevice().createCommandEncoder()
-                .clearColorAndDepthTextures(fb.getColorTexture(), 0, fb.getDepthTexture(), 1.0D);
+                .clearColorAndDepthTextures(fb.getColorTexture(), CLEAR_COLOR, fb.getDepthTexture(), RenderPipelineUtils.depthClearValue());
         }
     }
 
@@ -332,7 +376,7 @@ public class BBSRendering
         if (clear && fb.getColorTexture() != null && fb.getDepthTexture() != null)
         {
             RenderSystem.getDevice().createCommandEncoder()
-                .clearColorAndDepthTextures(fb.getColorTexture(), 0, fb.getDepthTexture(), 1.0D);
+                .clearColorAndDepthTextures(fb.getColorTexture(), CLEAR_COLOR, fb.getDepthTexture(), RenderPipelineUtils.depthClearValue());
         }
     }
 
@@ -346,7 +390,7 @@ public class BBSRendering
             return framebuffer;
         }
 
-        return Minecraft.getInstance().getMainRenderTarget();
+        return Minecraft.getInstance().gameRenderer != null ? Minecraft.getInstance().gameRenderer.mainRenderTarget() : null;
     }
 
     public static boolean isCustomSize()
@@ -403,7 +447,7 @@ public class BBSRendering
         bindMainFramebuffer(false);
         restoreGuiRenderState();
         GlStateManager._colorMask(ColorTargetState.WRITE_ALL);
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
     }
 
@@ -421,7 +465,7 @@ public class BBSRendering
         /* Keep vanilla's GL state cache synchronized between preview render passes. */
         GlStateManager._colorMask(ColorTargetState.WRITE_ALL);
         GlStateManager._depthMask(true);
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GlStateManager._disableCull();
         GlStateManager._depthFunc(GL11.GL_ALWAYS);
@@ -438,7 +482,7 @@ public class BBSRendering
     {
         GlStateManager._depthMask(true);
         GlStateManager._colorMask(ColorTargetState.WRITE_ALL);
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._blendFuncSeparate(770, 771, 1, 0);
         GlStateManager._enableDepthTest();
         GlStateManager._depthFunc(GL11.GL_LEQUAL);
@@ -493,7 +537,7 @@ public class BBSRendering
 
         if (client != null && client.gameRenderer != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
         }
 
         setShaderColor(1F, 1F, 1F, 1F);
@@ -508,7 +552,7 @@ public class BBSRendering
 
         Minecraft mc = Minecraft.getInstance();
 
-        if (mc != null && mc.getMainRenderTarget() != null)
+        if (mc != null && mc.gameRenderer != null && mc.gameRenderer.mainRenderTarget() != null)
         {
             bindMainFramebuffer(false);
         }
@@ -531,7 +575,7 @@ public class BBSRendering
 
         Minecraft mc = Minecraft.getInstance();
 
-        if (mc != null && mc.getMainRenderTarget() != null)
+        if (mc != null && mc.gameRenderer != null && mc.gameRenderer.mainRenderTarget() != null)
         {
             bindMainFramebuffer(false);
         }
@@ -577,7 +621,7 @@ public class BBSRendering
 
         Minecraft mc = Minecraft.getInstance();
 
-        if (mc != null && mc.getMainRenderTarget() != null)
+        if (mc != null && mc.gameRenderer != null && mc.gameRenderer.mainRenderTarget() != null)
         {
             bindMainFramebuffer(false);
         }
@@ -608,7 +652,7 @@ public class BBSRendering
 
         if (client != null && client.gameRenderer != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
         }
 
         clearTextureUnit0();
@@ -642,7 +686,7 @@ public class BBSRendering
 
         if (client != null && client.gameRenderer != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
         }
     }
 
@@ -658,7 +702,7 @@ public class BBSRendering
 
         if (client != null && client.level != null && client.gameRenderer != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
         }
     }
 
@@ -675,7 +719,7 @@ public class BBSRendering
 
         BlockPos pos = BlockPos.containing(entity.getX(), entity.getY(), entity.getZ());
 
-        return LevelRenderer.getLightCoords(entity.getWorld(), pos);
+        return LightCoordsUtil.getLightCoords(entity.getWorld(), pos);
     }
 
     /**
@@ -770,15 +814,21 @@ public class BBSRendering
 
     public static void resizeExtraFramebuffers()
     {
-        Set<RenderTarget> buffers = new HashSet<>();
         Minecraft mc = Minecraft.getInstance();
 
+        if (mc.levelRenderer == null)
+        {
+            return;
+        }
+
+        Set<RenderTarget> buffers = new HashSet<>();
+
         buffers.add(mc.levelRenderer.entityOutlineTarget());
-        buffers.add(mc.levelRenderer.getTranslucentTarget());
-        buffers.add(mc.levelRenderer.getItemEntityTarget());
-        buffers.add(mc.levelRenderer.getParticlesTarget());
-        buffers.add(mc.levelRenderer.getWeatherTarget());
-        buffers.add(mc.levelRenderer.getCloudsTarget());
+        buffers.add(mc.levelRenderer.translucentTarget());
+        buffers.add(mc.levelRenderer.itemEntityTarget());
+        buffers.add(mc.levelRenderer.particlesTarget());
+        buffers.add(mc.levelRenderer.weatherTarget());
+        buffers.add(mc.levelRenderer.cloudsTarget());
 
         for (RenderTarget buffer : buffers)
         {
@@ -830,7 +880,7 @@ public class BBSRendering
             }
 
             /* Never overwrite the real window FBO with our video-sized one. */
-            RenderTarget current = mc.getMainRenderTarget();
+            RenderTarget current = mc.gameRenderer != null ? mc.gameRenderer.mainRenderTarget() : null;
 
             if (current != null && current != framebuffer)
             {
@@ -844,12 +894,15 @@ public class BBSRendering
         }
         else
         {
-            RenderTarget target = clientFramebuffer != null ? clientFramebuffer : mc.getMainRenderTarget();
+            RenderTarget target = clientFramebuffer != null ? clientFramebuffer : (mc.gameRenderer != null ? mc.gameRenderer.mainRenderTarget() : null);
 
             if ((width != 0 || customSize) && framebuffer != null && UIScreen.getCurrentMenu() == null)
             {
-                /* 1.21.11: Framebuffer.draw(w, h) -> blitToScreen() */
-                framebuffer.blitToScreen();
+                /* 1.21.11 / 26.2: Framebuffer.blitToScreen() -> blitAndBlendToTexture */
+                if (target != null)
+                {
+                    framebuffer.blitAndBlendToTexture(target.getColorTextureView(), target.getDepthTextureView());
+                }
             }
 
             if (target != null && target != framebuffer)
@@ -876,7 +929,7 @@ public class BBSRendering
 
     private static void reassignFramebuffer(RenderTarget framebuffer)
     {
-        Minecraft.getInstance().mainRenderTarget = framebuffer;
+        Minecraft.getInstance().gameRenderer.mainRenderTarget = framebuffer;
     }
 
     /* Rendering */
@@ -1249,7 +1302,9 @@ public class BBSRendering
 
     public static void renderCoolStuff(LevelRenderContext worldRenderContext)
     {
-        if (Minecraft.getInstance().screen instanceof UIScreen screen)
+        WorldFormRenderer.get().flush();
+
+        if (Minecraft.getInstance().gui.screen() instanceof UIScreen screen)
         {
             screen.renderInWorld(worldRenderContext);
         }
@@ -1943,12 +1998,12 @@ public class BBSRendering
 
     public static void enableBlend()
     {
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
     }
 
     public static void disableBlend()
     {
-        GlStateManager._disableBlend();
+        GlStateManager._disableBlend(0);
     }
 
     public static void defaultBlendFunc()
@@ -2069,9 +2124,9 @@ public class BBSRendering
     {
         Minecraft client = Minecraft.getInstance();
 
-        if (client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+        if (client.gameRenderer != null && client.gameRenderer.lighting() != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
         }
     }
 
@@ -2079,9 +2134,9 @@ public class BBSRendering
     {
         Minecraft client = Minecraft.getInstance();
 
-        if (client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+        if (client.gameRenderer != null && client.gameRenderer.lighting() != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
         }
     }
 
@@ -2089,9 +2144,9 @@ public class BBSRendering
     {
         Minecraft client = Minecraft.getInstance();
 
-        if (client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+        if (client.gameRenderer != null && client.gameRenderer.lighting() != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_3D);
         }
     }
 
@@ -2099,9 +2154,9 @@ public class BBSRendering
     {
         Minecraft client = Minecraft.getInstance();
 
-        if (client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+        if (client.gameRenderer != null && client.gameRenderer.lighting() != null)
         {
-            client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+            client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
         }
     }
 

@@ -33,6 +33,7 @@ import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 
 import mchorse.bbs_mod.client.renderer.LightTexture;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.Identifier;
@@ -41,11 +42,11 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
@@ -944,7 +945,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
         PoseStack.Pose entry = stack.last();
         BufferBuilder buffer = Tesselator.getInstance().begin(
-            VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.ENTITY);
+            PrimitiveTopology.TRIANGLES, DefaultVertexFormat.ENTITY);
 
         this.irisVert(buffer, entry, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, tint, overlay, light);
         this.irisVert(buffer, entry, quad.p4.x, quad.p4.y, FACE_Z_BIAS, 1F, 1F, tint, overlay, light);
@@ -997,7 +998,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             stack.last().normal().identity();
             PoseStack.Pose entry = stack.last();
 
-            BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.ENTITY);
+            BufferBuilder buffer = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.ENTITY);
 
             int light = LightTexture.FULL_BRIGHT;
             int overlay = OverlayTexture.NO_OVERLAY;
@@ -1024,7 +1025,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
 
     private void drawSolidFront(Matrix4f matrix, Color color, Quad quad, GlProgram shader)
     {
-        BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder buffer = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
         this.col(buffer, matrix, quad.p1.x, quad.p1.y, FACE_Z_BIAS, color);
         this.col(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, color);
@@ -1089,7 +1090,7 @@ public class VideoFormRenderer extends FormRenderer<VideoForm> implements ITicka
             BBSRendering.enableDepthTest();
             BBSRendering.depthMask(true);
 
-            BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX_LIGHTMAP_COLOR);
+            BufferBuilder buffer = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_TEX_LIGHTMAP_COLOR);
 
             /* Same UV winding as {@link #drawVideoFront}. */
             this.pickVert(buffer, matrix, quad.p3.x, quad.p3.y, FACE_Z_BIAS, 0F, 1F, light, pickColor);

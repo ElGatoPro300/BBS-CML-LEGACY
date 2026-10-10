@@ -27,9 +27,7 @@ import mchorse.bbs_mod.utils.pose.Transform;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.Lightmap;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
@@ -41,6 +39,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
@@ -83,7 +82,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
             return;
         }
 
-        Camera camera = mc.gameRenderer.getMainCamera();
+        Camera camera = mc.gameRenderer.mainCamera();
         double distance = camera != null && camera.position() != null
             ? camera.position().distanceToSqr(x, y, z)
             : 0D;
@@ -299,6 +298,11 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
     @Override
     public void submit(ModelBlockEntityRenderState state, PoseStack matrices, SubmitNodeCollector queue, CameraRenderState cameraState)
     {
+        if (WorldFormRenderer.defer(matrices, stack -> this.submit(state, stack, queue, cameraState)))
+        {
+            return;
+        }
+
         ModelBlockEntity entity = state.entity;
 
         if (entity == null)
@@ -307,7 +311,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
         }
 
         float tickDelta = state.tickDelta;
-        MultiBufferSource vertexConsumers = Minecraft.getInstance().renderBuffers().bufferSource();
+        MultiBufferSource vertexConsumers = FormUtilsClient.getProvider();
         int light = state.lightCoords;
         int overlay = OverlayTexture.NO_OVERLAY;
         Minecraft mc = Minecraft.getInstance();
@@ -350,7 +354,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
             MatrixStackUtils.applyTransform(matrices, applied);
 
             int lightAbove = resolveModelBlockLight(entity, properties, transform, light);
-            Camera camera = mc.gameRenderer.getMainCamera();
+            Camera camera = mc.gameRenderer.mainCamera();
 
             GlStateManager._enableDepthTest();
             BBSRendering.setupMatchingWorldDiffuseLighting();
@@ -400,6 +404,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
             double z = pos.getZ() + tz;
 
             renderShadow(vertexConsumers, matrices, tickDelta, x, y, z, tx, ty, tz);
+            FormUtilsClient.getProvider().draw();
         }
 
         if (appliedRuntimeOverlay && properties.getForm() instanceof ModelForm modelForm)
@@ -411,7 +416,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
     private static Transform applyLookingAnimation(Minecraft mc, ModelBlockEntity entity, ModelProperties properties, float tickDelta)
     {
         Transform transform = properties.getTransform();
-        Camera camera = mc.gameRenderer.getMainCamera();
+        Camera camera = mc.gameRenderer.mainCamera();
         Vec3 position = !mc.options.getCameraType().isFirstPerson() && mc.player != null
             ? mc.player.getEyePosition(tickDelta)
             : camera.position();
@@ -564,7 +569,7 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
         int lightAbove = resolveModelBlockLight(entity, properties, transform, 0xF000F0);
         FormRenderingContext formContext = new FormRenderingContext()
             .set(FormRenderType.MODEL_BLOCK, entity.getEntity(), shadowStack, lightAbove, OverlayTexture.NO_OVERLAY, tickDelta)
-            .camera(mc.gameRenderer.getMainCamera());
+            .camera(mc.gameRenderer.mainCamera());
 
         formContext.isShadowPass = true;
 
@@ -592,10 +597,10 @@ public class ModelBlockEntityRenderer implements BlockEntityRenderer<ModelBlockE
 
         if (!properties.isLocalLighting())
         {
-            return LevelRenderer.getLightCoords(entity.getLevel(), pos);
+            return LightCoordsUtil.getLightCoords(entity.getLevel(), pos);
         }
 
-        return LevelRenderer.getLightCoords(entity.getLevel(), pos.offset(
+        return LightCoordsUtil.getLightCoords(entity.getLevel(), pos.offset(
             (int) transform.translate.x,
             (int) transform.translate.y,
             (int) transform.translate.z));

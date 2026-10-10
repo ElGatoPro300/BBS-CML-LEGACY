@@ -349,9 +349,9 @@ public class UIForms extends UIList<UIForms.FormEntry>
 
             y -= 10;
 
-            BBSRendering.setupLevelLighting();
+            Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
             FormUtilsClient.renderUI(form, context, x, y, x + 40, y + 40);
-            BBSRendering.setupItemsFlatLighting();
+            Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
 
             context.batcher.unclip(context);
         }

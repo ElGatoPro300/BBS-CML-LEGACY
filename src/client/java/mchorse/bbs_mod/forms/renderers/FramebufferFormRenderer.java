@@ -5,6 +5,7 @@ import mchorse.bbs_mod.camera.Camera;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.client.renderer.LightTexture;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.entities.StubEntity;
@@ -38,6 +39,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.opengl.GlProgram;
@@ -47,7 +49,6 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
@@ -304,9 +305,9 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             /* Flat ±Z only matters if a non-Unlit path still samples diffuse inside the FBO. */
             Minecraft client = Minecraft.getInstance();
 
-            if (client != null && client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+            if (client != null && client.gameRenderer != null && client.gameRenderer.lighting() != null)
             {
-                client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+                client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
             }
         }
 
@@ -369,7 +370,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
          * while RGB paints — black-looking texels that vanish underwater under Complementary. */
         GL14.glBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
         GL11.glEnable(GL11.GL_BLEND);
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._blendFuncSeparate(770, 771, 1, 0);
         BBSRendering.colorMask(true, true, true, true);
         GlStateManager._depthMask(true);
@@ -521,9 +522,9 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
         {
             Minecraft client = Minecraft.getInstance();
 
-            if (client != null && client.gameRenderer != null && client.gameRenderer.getLighting() != null)
+            if (client != null && client.gameRenderer != null && client.gameRenderer.lighting() != null)
             {
-                client.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+                client.gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
             }
         }
     }
@@ -590,7 +591,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             }
         }
 
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, format);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, format);
         Color color = Color.white();
         PoseStack.Pose entry = matrices.last();
         Matrix4f matrix = entry.pose();
@@ -762,7 +763,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
             {
                 FormRenderingContext tmp = new FormRenderingContext();
 
-                tmp.camera(mc.gameRenderer.getMainCamera());
+                tmp.camera(mc.gameRenderer.mainCamera());
                 this.lookAtCamera.copy(tmp.camera);
             }
         }
@@ -1026,7 +1027,7 @@ public class FramebufferFormRenderer extends FormRenderer<FramebufferForm>
 
         FormRenderingContext tmp = new FormRenderingContext();
 
-        tmp.camera(mc.gameRenderer.getMainCamera());
+        tmp.camera(mc.gameRenderer.mainCamera());
         this.lookAtCamera.copy(tmp.camera);
         this.lookAtViewSpaceAlready = false;
 

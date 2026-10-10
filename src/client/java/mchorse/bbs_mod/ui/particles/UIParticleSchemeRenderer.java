@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.ui.particles;
 
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 import mchorse.bbs_mod.graphics.Draw;
 import mchorse.bbs_mod.particles.ParticleScheme;
 import mchorse.bbs_mod.particles.components.expiration.ParticleComponentKillPlane;
@@ -16,12 +17,11 @@ import org.joml.Matrix4f;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 
 public class UIParticleSchemeRenderer extends UIModelRenderer
 {
@@ -105,11 +105,11 @@ public class UIParticleSchemeRenderer extends UIModelRenderer
         stack.pushPose();
         stack.setIdentity();
 
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._enableDepthTest();
         this.emitter.render(DefaultVertexFormat.PARTICLE, BBSRendering::getParticleProgram, stack, OverlayTexture.NO_OVERLAY, context.getTransition());
         GlStateManager._disableDepthTest();
-        GlStateManager._disableBlend();
+        GlStateManager._disableBlend(0);
 
         stack.popPose();
 
@@ -125,7 +125,7 @@ public class UIParticleSchemeRenderer extends UIModelRenderer
     {
         Matrix4f matrix = this.createCameraStack().last().pose();
 
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
         final float alpha = 0.5F;
 
         this.calculate(0, 0, a, b, c, d);

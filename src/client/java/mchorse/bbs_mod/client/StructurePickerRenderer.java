@@ -14,12 +14,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 
 import org.lwjgl.opengl.GL11;
 
@@ -64,9 +64,9 @@ public class StructurePickerRenderer
             return;
         }
 
-        Vec3 camera = mc.gameRenderer.getMainCamera().position();
+        Vec3 camera = mc.gameRenderer.mainCamera().position();
 
-        GlStateManager._enableBlend();
+        GlStateManager._enableBlend(0);
         GlStateManager._blendFuncSeparate(770, 771, 1, 0);
         /* Depth on: selection must not paint through buried blocks / walls. */
         GlStateManager._disableCull();
@@ -133,7 +133,7 @@ public class StructurePickerRenderer
         GlStateManager._depthMask(true);
         GlStateManager._enableDepthTest();
         GlStateManager._enableCull();
-        GlStateManager._disableBlend();
+        GlStateManager._disableBlend(0);
     }
 
     private static float[] resolveRegionColor(int regionIndex)
@@ -274,7 +274,7 @@ public class StructurePickerRenderer
             return;
         }
 
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
         stack.pushPose();
         stack.translate(x, y, z);
@@ -290,7 +290,7 @@ public class StructurePickerRenderer
         float fh = (float) h;
         float fd = (float) d;
         float t = 1F / 96F + (float) (Math.sqrt(w * w + h * h + d * d) / 2000D);
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
         stack.pushPose();
         stack.translate(x, y, z);

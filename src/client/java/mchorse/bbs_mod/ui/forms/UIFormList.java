@@ -2507,11 +2507,11 @@ public class UIFormList extends UIElement
             this.setSelected(selected);
         }
 
-        BBSRendering.setupLevelLighting();
+        Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
 
         super.render(context);
 
-        BBSRendering.setupItemsFlatLighting();
+        Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
 
     }
 

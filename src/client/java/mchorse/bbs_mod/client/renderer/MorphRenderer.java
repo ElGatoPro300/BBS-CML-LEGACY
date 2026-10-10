@@ -1,6 +1,9 @@
 package mchorse.bbs_mod.client.renderer;
 
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.data.types.MapType;
+import mchorse.bbs_mod.forms.CustomVertexConsumerProvider;
+import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.MobForm;
@@ -17,7 +20,6 @@ import mchorse.bbs_mod.ui.morphing.UIMorphingPanel;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
@@ -38,10 +40,17 @@ public class MorphRenderer
         Morph morph = Morph.getMorph(player);
         boolean localPlayer = player == Minecraft.getInstance().player;
         Form liveEditForm = localPlayer ? resolveLiveEditForm() : null;
+        Form playerForm = morph != null ? morph.getForm() : null;
+        boolean hidePlayer = MorphRenderer.hidePlayer;
 
         /* Form editor open without F7: orbit preview only — skip world body (avoids double /
          * stale morph behind the dark scrim). */
         if (liveEditForm != null && !UIMorphingPanel.toggleWorldPreview)
+        {
+            return true;
+        }
+
+        if (hidePlayer && !isLivingPlayerForm(playerForm) && (liveEditForm == null || !UIMorphingPanel.toggleWorldPreview))
         {
             return true;
         }
@@ -57,7 +66,7 @@ public class MorphRenderer
         /* F7 live preview draws the in-edit form on the local player; otherwise the applied morph. */
         Form formToRender = liveEditForm != null && UIMorphingPanel.toggleWorldPreview
             ? liveEditForm
-            : (morph != null ? morph.getForm() : null);
+            : playerForm;
 
         if (formToRender == null || morph == null)
         {
@@ -72,79 +81,126 @@ public class MorphRenderer
             return false;
         }
 
-        GlStateManager._enableDepthTest();
-
-        boolean worldPass = BBSRendering.isRenderingWorld();
-
-        /* InventoryScreen.drawEntity uses ENTITY_IN_UI for the player
-         * preview, then INVENTORY after. Forms must keep those same
-         * entity lights. World morphs keep level diffuse like model blocks. */
-        if (worldPass)
+        if (canRender(formToRender))
         {
-            BBSRendering.setupWorldLevelDiffuseLighting();
-        }
-        else
-        {
-            Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
-        }
-
-        int overlay = OverlayTexture.NO_OVERLAY;
-
-        float bodyYaw = playerState.bodyRot;
-        float pitch = playerState.xRot;
-        float headYaw = playerState.bodyRot + playerState.yRot;
-        float yaw = headYaw;
-
-        matrixStack.pushPose();
-        matrixStack.mulPose(Axis.YP.rotationDegrees(-bodyYaw));
-
-        morph.entity.setRotationOverride(pitch, pitch, headYaw, headYaw, bodyYaw, bodyYaw, yaw, yaw);
-
-        try
-        {
-            FormRenderingContext morphContext = new FormRenderingContext()
-                .set(FormRenderType.ENTITY, morph.entity, matrixStack, i, overlay, g)
-                .camera(Minecraft.getInstance().gameRenderer.getMainCamera());
-
-            /* Inventory / non-world drawEntity: soft must draw live (queues never flush). */
-            if (!worldPass)
+            if (WorldFormRenderer.defer(matrixStack, stack -> renderPlayer(player, playerState, g, stack, renderCommandQueue, i)))
             {
-                morphContext.inUI();
+                return true;
             }
 
-            FormUtilsClient.render(formToRender, morphContext);
+            GlStateManager._enableDepthTest();
 
-            if (morph.entity.getFireTicks() > 0)
+            boolean worldPass = BBSRendering.isRenderingWorld();
+
+            /* InventoryScreen.drawEntity uses ENTITY_IN_UI for the player
+             * preview, then INVENTORY after. Forms must keep those same
+             * entity lights. World morphs keep level diffuse like model blocks. */
+            if (worldPass)
             {
-                MorphFireRenderer.render(
-                    matrixStack,
-                    (MultiBufferSource) null,
-                    morph.entity,
-                    formToRender,
-                    g,
-                    Minecraft.getInstance().gameRenderer.getMainCamera(),
-                    false
-                );
+                BBSRendering.setupWorldLevelDiffuseLighting();
             }
-        }
-        finally
-        {
-            morph.entity.clearRotationOverride();
-        }
+            else
+            {
+                Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
+            }
 
-        matrixStack.popPose();
+            int overlay = OverlayTexture.NO_OVERLAY;
 
-        if (worldPass)
-        {
-            BBSRendering.restoreWorldRenderState();
-        }
-        else
-        {
-            Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
-            BBSRendering.restoreWorldRenderState();
+            float bodyYaw = playerState.bodyRot;
+            float pitch = playerState.xRot;
+            float headYaw = playerState.bodyRot + playerState.yRot;
+            float yaw = headYaw;
+
+            matrixStack.pushPose();
+            matrixStack.mulPose(Axis.YP.rotationDegrees(-bodyYaw));
+
+            morph.entity.setRotationOverride(pitch, pitch, headYaw, headYaw, bodyYaw, bodyYaw, yaw, yaw);
+
+            try
+            {
+                FormRenderingContext morphContext = new FormRenderingContext()
+                    .set(FormRenderType.ENTITY, morph.entity, matrixStack, i, overlay, g)
+                    .camera(Minecraft.getInstance().gameRenderer.mainCamera());
+
+                /* Inventory / non-world drawEntity: soft must draw live (queues never flush). */
+                if (!worldPass)
+                {
+                    morphContext.inUI();
+                }
+
+                FormUtilsClient.render(formToRender, morphContext);
+
+                if (morph.entity.getFireTicks() > 0)
+                {
+                    MorphFireRenderer.render(
+                        matrixStack,
+                        morph.entity,
+                        formToRender,
+                        g,
+                        Minecraft.getInstance().gameRenderer.mainCamera(),
+                        false
+                    );
+                }
+            }
+            finally
+            {
+                morph.entity.clearRotationOverride();
+            }
+
+            matrixStack.popPose();
+
+            if (worldPass)
+            {
+                BBSRendering.restoreWorldRenderState();
+            }
+            else
+            {
+                Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_3D);
+                BBSRendering.restoreWorldRenderState();
+            }
         }
 
         return true;
+    }
+
+    public static boolean isLivingPlayerForm(Form form)
+    {
+        return form instanceof MobForm mobForm && mobForm.isPlayer();
+    }
+
+    private static boolean canRender(Form playerForm)
+    {
+        UIBaseMenu menu = UIScreen.getCurrentMenu();
+
+        if (menu instanceof UIDashboard dashboard)
+        {
+            UIDashboardPanel panel = dashboard.getPanels().panel;
+
+            if (panel instanceof UIMorphingPanel morphingPanel && morphingPanel.palette.editor.isEditing())
+            {
+                return areFormsEquivalent(morphingPanel.palette.editor.form, playerForm);
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean areFormsEquivalent(Form a, Form b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        if (a == null || b == null)
+        {
+            return false;
+        }
+
+        MapType dataA = FormUtils.toData(a);
+        MapType dataB = FormUtils.toData(b);
+
+        return dataA != null && dataA.equals(dataB);
     }
 
     /**
@@ -169,7 +225,7 @@ public class MorphRenderer
         return morphingPanel.palette.editor.form;
     }
 
-    public static boolean renderLivingEntity(LivingEntity livingEntity, LivingEntityRenderState livingState, float g, PoseStack matrixStack, MultiBufferSource vertexConsumerProvider, int i, int o)
+    public static boolean renderLivingEntity(LivingEntity livingEntity, LivingEntityRenderState livingState, float g, PoseStack matrixStack, CustomVertexConsumerProvider vertexConsumerProvider, int i, int o)
     {
         if (!(livingEntity instanceof ISelectorOwnerProvider))
         {
@@ -184,6 +240,11 @@ public class MorphRenderer
 
         if (form != null)
         {
+            if (WorldFormRenderer.defer(matrixStack, stack -> renderLivingEntity(livingEntity, livingState, g, stack, vertexConsumerProvider, i, o)))
+            {
+                return true;
+            }
+
             GlStateManager._enableDepthTest();
 
             float bodyYaw = livingState.bodyRot;
@@ -200,17 +261,16 @@ public class MorphRenderer
             {
                 FormUtilsClient.render(form, new FormRenderingContext()
                     .set(FormRenderType.ENTITY, owner.entity, matrixStack, i, o, g)
-                    .camera(Minecraft.getInstance().gameRenderer.getMainCamera()));
+                    .camera(Minecraft.getInstance().gameRenderer.mainCamera()));
 
                 if (owner.entity.getFireTicks() > 0)
                 {
                     MorphFireRenderer.render(
                         matrixStack,
-                        vertexConsumerProvider,
                         owner.entity,
                         form,
                         g,
-                        Minecraft.getInstance().gameRenderer.getMainCamera(),
+                        Minecraft.getInstance().gameRenderer.mainCamera(),
                         false
                     );
                 }

@@ -1980,7 +1980,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         int savedFrontFace = GL11.glGetInteger(GL11.GL_FRONT_FACE);
         /* Reflections / odd MV×entity stacks invert winding — keep GL_BACK = camera-facing.
          * Use live ModelView (Iris restores it before this draw) × entity root. */
-        Matrix4f facingMatrix = new Matrix4f(RenderSystem.getModelViewMatrix());
+        Matrix4f facingMatrix = new Matrix4f(RenderSystem.getModelViewMatrixCopy());
 
         if (positionMatrix != null)
         {
@@ -2807,7 +2807,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         boolean cullWasEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
         int savedCullFace = GL11.glGetInteger(GL11.GL_CULL_FACE_MODE);
         int savedFrontFace = GL11.glGetInteger(GL11.GL_FRONT_FACE);
-        Matrix4f facingMatrix = new Matrix4f(RenderSystem.getModelViewMatrix());
+        Matrix4f facingMatrix = new Matrix4f(RenderSystem.getModelViewMatrixCopy());
 
         if (positionMatrix != null)
         {
@@ -3471,7 +3471,6 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         return target.getLimbPos(tickDelta);
     }
-
 
     /**
      * Active spyglass on player ModelForms via {@link BbsHeadItemSpace} (BBS adaptation of

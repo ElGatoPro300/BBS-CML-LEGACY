@@ -4,6 +4,7 @@ import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.BBSUniform;
 import mchorse.bbs_mod.client.render.BufferRenderer;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 import mchorse.bbs_mod.cubic.ModelInstance;
 import mchorse.bbs_mod.graphics.Framebuffer;
 import mchorse.bbs_mod.graphics.texture.Texture;
@@ -21,12 +22,12 @@ import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import org.lwjgl.opengl.GL11;
@@ -142,8 +143,8 @@ public class FormOutlineRenderer
         }
 
         Minecraft client = Minecraft.getInstance();
-        int width = Math.max(2, client.getMainRenderTarget().width);
-        int height = Math.max(2, client.getMainRenderTarget().height);
+        int width = Math.max(2, client.gameRenderer.mainRenderTarget().width);
+        int height = Math.max(2, client.gameRenderer.mainRenderTarget().height);
 
         framebuffers.updateForScreenSize(width, height);
 
@@ -192,7 +193,7 @@ public class FormOutlineRenderer
             GlStateManager._enableDepthTest();
             GlStateManager._depthFunc(GL11.GL_LEQUAL);
             GlStateManager._depthMask(false);
-            GlStateManager._disableBlend();
+            GlStateManager._disableBlend(0);
             GlStateManager._enableCull();
 
             boolean polygonOffsetWasEnabled = GL11.glIsEnabled(GL11.GL_POLYGON_OFFSET_FILL);
@@ -225,7 +226,7 @@ public class FormOutlineRenderer
 
             GlStateManager._disableDepthTest();
             GlStateManager._depthMask(false);
-            GlStateManager._disableBlend();
+            GlStateManager._disableBlend(0);
             GlStateManager._disableCull();
 
             BBSRendering.bindProgram(dilateShader);
@@ -251,7 +252,7 @@ public class FormOutlineRenderer
             Texture dilateTexture = dilateFramebuffer.getMainTexture();
 
             GlStateManager._disableDepthTest();
-            GlStateManager._enableBlend();
+            GlStateManager._enableBlend(0);
             GlStateManager._blendFuncSeparate(770, 771, 1, 0);
             GlStateManager._disableCull();
 
@@ -290,11 +291,11 @@ public class FormOutlineRenderer
 
             if (blendWasEnabled)
             {
-                GlStateManager._enableBlend();
+                GlStateManager._enableBlend(0);
             }
             else
             {
-                GlStateManager._disableBlend();
+                GlStateManager._disableBlend(0);
             }
 
             GlStateManager._enableCull();
@@ -356,7 +357,7 @@ public class FormOutlineRenderer
 
     private static void drawFullscreenQuad(float z)
     {
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX);
 
         /* Fullscreen quad in NDC space. */
         builder.addVertex(-1F, -1F, z).setUv(0F, 0F);

@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.Identifier;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.opengl.GlTextureView;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -13,7 +14,6 @@ import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -142,8 +142,8 @@ public final class AdoptedTexture extends AbstractTexture
     {
         private AdoptedGlTexture(int glId, String label, int width, int height)
         {
-            super(USAGE, label, TextureFormat.RGBA8,
-                Math.max(1, width), Math.max(1, height), 1, 1, glId);
+            super(USAGE, label, GpuFormat.RGBA8_UNORM,
+                Math.max(1, width), Math.max(1, height), 1, 1, glId, null);
         }
 
         @Override
@@ -156,7 +156,7 @@ public final class AdoptedTexture extends AbstractTexture
     {
         private AdoptedGlTextureView(AdoptedGlTexture texture)
         {
-            super(texture, 0, 1);
+            super(texture, 0, 1, null);
         }
 
         @Override

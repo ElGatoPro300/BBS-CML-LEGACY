@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.mixin.client;
 
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.renderer.WorldFormRenderer;
 import mchorse.bbs_mod.utils.colors.Color;
 
 import net.minecraft.client.CloudStatus;
@@ -11,6 +12,7 @@ import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -22,8 +24,29 @@ import com.mojang.blaze3d.framegraph.FramePass;
 import org.lwjgl.opengl.GL11;
 
 @Mixin(LevelRenderer.class)
-public class WorldRendererMixin
+public class WorldRendererMixin implements WorldFormRenderer.Provider
 {
+    @Unique
+    private final WorldFormRenderer bbs$worldForms = new WorldFormRenderer();
+
+    @Override
+    public WorldFormRenderer bbs$getWorldForms()
+    {
+        return this.bbs$worldForms;
+    }
+
+    @Inject(method = "submitFeatures", at = @At("HEAD"))
+    private void bbs$beginFormSubmission(CallbackInfo info)
+    {
+        this.bbs$worldForms.beginSubmission();
+    }
+
+    @Inject(method = "submitFeatures", at = @At("RETURN"))
+    private void bbs$endFormSubmission(CallbackInfo info)
+    {
+        this.bbs$worldForms.endSubmission();
+    }
+
     @Shadow
     private LevelTargetBundle targets;
 
@@ -62,12 +85,6 @@ public class WorldRendererMixin
         {
             info.cancel();
         }
-    }
-
-    @Inject(at = @At("RETURN"), method = "initOutline")
-    private void onLoadEntityOutlineShader(CallbackInfo info)
-    {
-        BBSRendering.resizeExtraFramebuffers();
     }
 
     @Inject(at = @At("RETURN"), method = "resize")

@@ -455,7 +455,7 @@ public class StructurePickerClient
         StructurePickerClient.rightMouseDown = rightDown;
         StructurePickerClient.leftMouseDown = leftDown;
 
-        if (UIStructurePickerPanel.isOpened() || mc.screen != null || !StructurePickerClient.isActive())
+        if (UIStructurePickerPanel.isOpened() || mc.gui.screen() != null || !StructurePickerClient.isActive())
         {
             StructurePickerClient.leftSelectArmed = false;
             StructurePickerClient.hoveredRegionIndex = -1;

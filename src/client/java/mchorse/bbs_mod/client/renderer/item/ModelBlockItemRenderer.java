@@ -118,13 +118,13 @@ public class ModelBlockItemRenderer implements SpecialModelRenderer<ItemStack>
 
                     FormUtilsClient.render(form, new FormRenderingContext()
                         .set(FormRenderType.fromModelMode(mode), item.formEntity, matrices, renderLight, overlay, Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false))
-                        .camera(Minecraft.getInstance().gameRenderer.getMainCamera()));
+                        .camera(Minecraft.getInstance().gameRenderer.mainCamera()));
                 }
                 finally
                 {
                     if (mode == ItemDisplayContext.GUI)
                     {
-                        Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+                        Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ITEMS_FLAT);
                         BBSRendering.restoreAfterGuiItemForm();
                         BBSRendering.depthMask(true);
                         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);

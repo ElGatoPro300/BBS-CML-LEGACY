@@ -14,11 +14,11 @@ import net.minecraft.client.Minecraft;
 
 import org.joml.Matrix4f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 
 import org.lwjgl.opengl.GL11;
 
@@ -390,7 +390,7 @@ public class WaterMediaVideoRenderer
         BBSRendering.disableCull();
 
         Tesselator tessellator = Tesselator.getInstance();
-        BufferBuilder buffer = tessellator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        BufferBuilder buffer = tessellator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX);
         Matrix4f matrix = stack.last().pose();
 
         /* Desplazar por recorte de izquierda/arriba para mantener el contenido en su lugar. */

@@ -14,6 +14,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -25,6 +26,19 @@ import java.util.List;
 @Mixin(Entity.class)
 public class EntityMixin
 {
+    @Shadow
+    private int id;
+
+    @Inject(method = "getId", at = @At("HEAD"), cancellable = true)
+    public void bbs$safeGetId(CallbackInfoReturnable<Integer> info)
+    {
+        if (this.id == 0)
+        {
+            this.id = -100000 - Math.abs(System.identityHashCode(this) % 800000);
+            info.setReturnValue(this.id);
+        }
+    }
+
     @Inject(method = "getEyeHeight(Lnet/minecraft/world/entity/Pose;)F", at = @At("HEAD"), cancellable = true)
     public void getEyeHeight(Pose pose, CallbackInfoReturnable<Float> info)
     {
@@ -59,8 +73,8 @@ public class EntityMixin
         }
     }
 
-    @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
-    public void onIsPickable(CallbackInfoReturnable<Boolean> info)
+    @Inject(method = "canBeCollidedWith", at = @At("HEAD"), cancellable = true)
+    public void onIsCollidable(Entity other, CallbackInfoReturnable<Boolean> info)
     {
         if ((Object) this instanceof IMorphProvider provider)
         {
@@ -109,11 +123,10 @@ public class EntityMixin
      * Inject solid model/structure hitboxes into every movement collision list,
      * including the step-up pass ({@code list2}) which previously only saw block shapes.
      */
-    @Inject(method = "collectColliders", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "collectAllColliders", at = @At("RETURN"), cancellable = true)
     private static void bbs$appendSolidHitboxes(
         @Nullable Entity entity,
         Level world,
-        List<VoxelShape> regularCollisions,
         AABB movingEntityBoundingBox,
         CallbackInfoReturnable<List<VoxelShape>> info)
     {

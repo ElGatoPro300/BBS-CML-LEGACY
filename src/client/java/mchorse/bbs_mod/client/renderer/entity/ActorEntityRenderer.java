@@ -3,6 +3,8 @@ package mchorse.bbs_mod.client.renderer.entity;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.renderer.ModelBlockEntityRenderer;
 import mchorse.bbs_mod.client.renderer.MorphFireRenderer;
+import mchorse.bbs_mod.client.renderer.MultiBufferSource;
+import mchorse.bbs_mod.client.renderer.WorldFormRenderer;
 import mchorse.bbs_mod.cubic.render.vanilla.ArmorRenderer;
 import mchorse.bbs_mod.entity.ActorEntity;
 import mchorse.bbs_mod.forms.FormUtilsClient;
@@ -15,7 +17,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.object.equipment.ElytraModel;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.ArmorModelSet;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -132,6 +133,16 @@ public class ActorEntityRenderer extends EntityRenderer<ActorEntity, ActorEntity
     @Override
     public void submit(ActorEntityState state, PoseStack matrices, SubmitNodeCollector queue, CameraRenderState cameraState)
     {
+        if (!WorldFormRenderer.defer(matrices, stack -> this.renderForm(state, stack)))
+        {
+            this.renderForm(state, matrices);
+        }
+
+        super.submit(state, matrices, queue, cameraState);
+    }
+
+    private void renderForm(ActorEntityState state, PoseStack matrices)
+    {
         ActorEntity livingEntity = state.entity;
 
         if (livingEntity == null)
@@ -145,7 +156,8 @@ public class ActorEntityRenderer extends EntityRenderer<ActorEntity, ActorEntity
 
         if (this.shouldDrawCustomGroundShadow(livingEntity))
         {
-            this.renderFilmGroundShadow(livingEntity, tickDelta, matrices, Minecraft.getInstance().renderBuffers().bufferSource());
+            this.renderFilmGroundShadow(livingEntity, tickDelta, matrices, FormUtilsClient.getProvider());
+            FormUtilsClient.getProvider().draw();
         }
 
         matrices.pushPose();
@@ -171,17 +183,16 @@ public class ActorEntityRenderer extends EntityRenderer<ActorEntity, ActorEntity
         }
         FormUtilsClient.render(livingEntity.getForm(), new FormRenderingContext()
             .set(FormRenderType.ENTITY, livingEntity.getWrappingEntity(), matrices, state.lightCoords, overlay, animDelta)
-            .camera(Minecraft.getInstance().gameRenderer.getMainCamera()));
+            .camera(Minecraft.getInstance().gameRenderer.mainCamera()));
 
         if (livingEntity.getWrappingEntity().getFireTicks() > 0)
         {
             MorphFireRenderer.render(
                 matrices,
-                Minecraft.getInstance().renderBuffers().bufferSource(),
                 livingEntity.getWrappingEntity(),
                 livingEntity.getForm(),
                 animDelta,
-                Minecraft.getInstance().gameRenderer.getMainCamera(),
+                Minecraft.getInstance().gameRenderer.mainCamera(),
                 false
             );
         }
@@ -189,11 +200,10 @@ public class ActorEntityRenderer extends EntityRenderer<ActorEntity, ActorEntity
         BBSRendering.restoreWorldRenderState();
         GlStateManager._disableDepthTest();
         GlStateManager._depthFunc(GL11.GL_LEQUAL);
-        GlStateManager._disableBlend();
+        GlStateManager._disableBlend(0);
 
         matrices.popPose();
 
-        super.submit(state, matrices, queue, cameraState);
     }
 
     private boolean shouldDrawCustomGroundShadow(ActorEntity entity)

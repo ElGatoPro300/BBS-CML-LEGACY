@@ -27,7 +27,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -1084,7 +1084,7 @@ public final class RecorderMobCapture
             return true;
         }
 
-        return living.getType() == EntityType.SNOW_GOLEM;
+        return living.getType() == EntityTypes.SNOW_GOLEM;
     }
 
     private static final List<String> MOB_NBT_STRIP_KEYS = Arrays.asList(

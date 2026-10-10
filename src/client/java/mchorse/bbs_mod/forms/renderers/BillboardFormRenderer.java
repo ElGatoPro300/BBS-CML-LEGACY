@@ -6,6 +6,7 @@ import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.render.BufferRenderer;
 import mchorse.bbs_mod.client.renderer.LightTexture;
+import mchorse.bbs_mod.client.renderer.Tesselator;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.forms.forms.BillboardForm;
 import mchorse.bbs_mod.forms.forms.utils.EffectTransform;
@@ -38,11 +39,11 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
@@ -765,7 +766,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
 
             try
             {
-                BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, format);
+                BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, format);
 
                 float quadWidth = Math.abs(quad.p2.x - quad.p1.x);
                 float quadHeight = Math.abs(quad.p1.y - quad.p3.y);
@@ -978,7 +979,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
     {
         Matrix4f matrix = matrices.last().pose();
         PoseStack.Pose entry = matrices.last();
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, format);
+        BufferBuilder builder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, format);
         boolean dualSided = !singleSided && !ModelVAORenderer.isPaintOverlayPass();
         float faceZ = singleSided ? this.resolveOverlayFaceZ(matrix) : 0F;
         float frontNz = faceZ >= 0F ? 1F : -1F;
@@ -1140,7 +1141,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
 
         FlatPaintOverlayPass.render(polygonOffsetFactor, polygonOffsetUnits, formRootInverse, transform, false, MASK_HALF, () ->
         {
-            BufferBuilder paintBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.ENTITY);
+            BufferBuilder paintBuilder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.ENTITY);
             int paintLight = LightTexture.FULL_BRIGHT;
             float paintZ = this.resolveOverlayFaceZ(paintMatrix);
             float paintNz = paintZ >= 0F ? 1F : -1F;
@@ -1318,7 +1319,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
 
         FlatColorTintOverlayPass.render(polygonOffsetFactor, polygonOffsetUnits, formRootInverse, transform, false, MASK_HALF, formTintColor, () ->
         {
-            BufferBuilder tintBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.ENTITY);
+            BufferBuilder tintBuilder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.ENTITY);
             int tintLight = LightTexture.FULL_BRIGHT;
             float tintZ = this.resolveOverlayFaceZ(tintMatrix);
             float tintNz = tintZ >= 0F ? 1F : -1F;
@@ -1464,7 +1465,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
 
         FlatGlowOverlayPass.renderMasked(polygonOffsetFactor, polygonOffsetUnits, formRootInverse, glowTransform, false, MASK_HALF, shaderScale, () ->
         {
-            BufferBuilder glowBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.ENTITY);
+            BufferBuilder glowBuilder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.ENTITY);
             int glowLight = LightTexture.FULL_BRIGHT;
             float glowZ = this.resolveOverlayFaceZ(glowMatrix);
             float glowNz = glowZ >= 0F ? 1F : -1F;
@@ -1507,7 +1508,7 @@ public class BillboardFormRenderer extends FormRenderer<BillboardForm>
 
         FlatGlowOverlayPass.render(glowSettings, legacyGlow, alpha, glowIntensity, (glowColor) ->
         {
-            BufferBuilder glowBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX_COLOR);
+            BufferBuilder glowBuilder = Tesselator.getInstance().begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION_TEX_COLOR);
 
             BBSRendering.bindProgram(BBSRendering.getPositionTexColorProgram());
             float glowZ = this.resolveOverlayFaceZ(glowMatrix);
