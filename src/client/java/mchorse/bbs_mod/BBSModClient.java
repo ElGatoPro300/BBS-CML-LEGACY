@@ -1013,6 +1013,7 @@ public class BBSModClient implements ClientModInitializer
             DiscordPresenceManager.INSTANCE.init();
             DiscordPresenceManager.INSTANCE.onClientStarted();
             BBSRendering.setupFramebuffer();
+            ActorEntityRenderer.getArmorRenderer();
             provider.register(new MinecraftSourcePack());
             RtlFontManager.ensureLoaded();
 

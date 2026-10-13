@@ -20,6 +20,7 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.model.ArmorEntityModel;
 import net.minecraft.client.render.entity.model.ElytraEntityModel;
+import net.minecraft.client.render.model.BakedModelManager;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.util.Identifier;
@@ -33,20 +34,40 @@ import org.lwjgl.opengl.GL11;
 public class ActorEntityRenderer extends EntityRenderer<ActorEntity>
 {
     public static ArmorRenderer armorRenderer;
+    private static BakedModelManager lastBakery;
 
-    public ActorEntityRenderer(EntityRendererFactory.Context ctx)
+    public static ArmorRenderer getArmorRenderer()
     {
-        super(ctx);
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client != null)
+        {
+            BakedModelManager bakery = client.getBakedModelManager();
+
+            if (bakery != null && (armorRenderer == null || lastBakery != bakery))
+            {
+                lastBakery = bakery;
+                armorRenderer = createArmorRenderer(bakery);
+            }
+        }
+
+        return armorRenderer;
+    }
+
+    public static ArmorRenderer createArmorRenderer(BakedModelManager bakery)
+    {
+        if (bakery == null)
+        {
+            return null;
+        }
 
         /* Private copies — ArmorRenderer mutates pivots/wings; never share with vanilla players. */
-        armorRenderer = new ArmorRenderer(
+        return new ArmorRenderer(
             new ArmorEntityModel(TexturedModelData.of(ArmorEntityModel.getModelData(new Dilation(0.5F)), 64, 32).createModel()),
             new ArmorEntityModel(TexturedModelData.of(ArmorEntityModel.getModelData(new Dilation(1.0F)), 64, 32).createModel()),
             new ElytraEntityModel(ElytraEntityModel.getTexturedModelData().createModel()),
-            ctx.getModelManager()
+            bakery
         );
-
-        this.shadowRadius = 0.5F;
     }
 
     /**
@@ -68,6 +89,16 @@ public class ActorEntityRenderer extends EntityRenderer<ActorEntity>
         {
             actorRenderer.applyShadowRadius(entity);
         }
+    }
+
+    public ActorEntityRenderer(EntityRendererFactory.Context ctx)
+    {
+        super(ctx);
+
+        lastBakery = ctx.getModelManager();
+        armorRenderer = createArmorRenderer(lastBakery);
+
+        this.shadowRadius = 0.5F;
     }
 
     private void applyShadowRadius(ActorEntity entity)

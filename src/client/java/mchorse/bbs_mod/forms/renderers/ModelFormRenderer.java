@@ -22,6 +22,7 @@ import mchorse.bbs_mod.cubic.model.ArmorType;
 import mchorse.bbs_mod.cubic.model.bobj.BOBJModel;
 import mchorse.bbs_mod.cubic.physics.DynamicBoneOrchestrator;
 import mchorse.bbs_mod.cubic.render.ShapeKeyGlowPass;
+import mchorse.bbs_mod.cubic.render.vanilla.ArmorRenderer;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAORenderer;
 import mchorse.bbs_mod.forms.CustomVertexConsumerProvider;
 import mchorse.bbs_mod.forms.FormUtilsClient;
@@ -3299,6 +3300,13 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         if (matrix != null)
         {
+            ArmorRenderer armor = ActorEntityRenderer.getArmorRenderer();
+
+            if (armor == null)
+            {
+                return;
+            }
+
             CustomVertexConsumerProvider consumers = FormUtilsClient.getProvider();
 
             stack.push();
@@ -3308,7 +3316,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             CustomVertexConsumerProvider.hijackVertexFormat((l) -> RenderSystem.enableBlend());
 
-            ActorEntityRenderer.armorRenderer.renderArmorSlot(stack, consumers, target, type.slot, type, light);
+            armor.renderArmorSlot(stack, consumers, target, type.slot, type, light);
             consumers.draw();
 
             CustomVertexConsumerProvider.clearRunnables();
